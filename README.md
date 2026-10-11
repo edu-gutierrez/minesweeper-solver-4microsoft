@@ -115,4 +115,25 @@ minas en rojo y casillas seguras en verde. No se hacen clics.
 el solver deduce 15 minas adicionales y cuatro casillas seguras.
 
 Pendiente: probabilidades, reconocimiento de minas visibles,
-condiciones de cada desafío y control del ratón.
+condiciones de cada desafío y bucle automático de partida completa.
+
+## Prueba en vivo del modo clásico (Windows)
+
+```console
+python live.py --output live-test
+python live.py --execute --output live-test
+```
+
+La primera orden solo genera un plan. La segunda coloca las banderas pendientes
+y abre como máximo una casilla segura, y termina. Abre una partida clásica
+iniciada y pon Microsoft Minesweeper en primer plano durante la cuenta atrás de
+cinco segundos. No muevas la ventana ni juegues durante el análisis. Se usa la
+posición actual de la ventana y los centros detectados, no las coordenadas de
+las capturas anteriores. Lleva el ratón a una esquina para activar la parada de
+PyAutoGUI. Si no hay deducciones seguras, no se abre ninguna casilla.
+
+El programa comprueba el foco, la posición y que el tablero no cambió durante
+el OCR. Coloca las banderas en bloque sin releer entre ellas. Después de las
+acciones guarda after.png, relee y verifica las banderas y la apertura. Si una
+acción no se verifica, termina sin repetirla. Aún no hay bucle de partida completa.
+Las banderas previas deben ser correctas; las marcas verdes se consideran tapadas.

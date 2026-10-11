@@ -23,7 +23,7 @@ def configure_tesseract():
     pytesseract.pytesseract.tesseract_cmd = executable
 
 
-def prepare_digit(crop, threshold=165):
+def prepare_digit(crop, threshold=195):
     gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
     # El interior claro confirma que es una casilla descubierta en este tema.
     white = np.min(crop, axis=2) > 185
@@ -45,7 +45,7 @@ def prepare_digit(crop, threshold=165):
     return cv2.copyMakeBorder(glyph, 25, 25, 25, 25, cv2.BORDER_CONSTANT, value=255), True
 
 
-def read_digit(crop, threshold=165):
+def read_digit(crop, threshold=195):
     glyph, is_open = prepare_digit(crop, threshold)
     if not is_open:
         return {"value": None, "status": "unclassified", "confidence": None}
@@ -84,6 +84,10 @@ def is_flag(crop):
 def read_cell(crop, detected=True):
     hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
     hue, saturation, brightness = cv2.split(hsv)
+    blue = (hue >= 90) & (hue <= 115) & (saturation > 70) & (brightness > 140)
+    marked = (hue >= 30) & (hue <= 50) & (saturation > 100) & (brightness > 140)
+    if np.mean(blue) > 0.65 or np.mean(marked) > 0.65:
+        return {"value": "?", "status": "covered", "confidence": None, "flag_visible": False}
     if not detected:
         dark = brightness < 100
         if np.mean(dark) > 0.95:
@@ -92,13 +96,9 @@ def read_cell(crop, detected=True):
     if is_flag(crop):
         # El usuario confirmó que las banderas iniciales del desafío son fiables.
         return {"value": "f", "status": "flag", "confidence": None, "flag_visible": True}
-    blue = (hue >= 90) & (hue <= 115) & (saturation > 70) & (brightness > 140)
-    marked = (hue >= 30) & (hue <= 50) & (saturation > 100) & (brightness > 140)
-    if np.mean(blue) > 0.65 or np.mean(marked) > 0.65:
-        return {"value": "?", "status": "covered", "confidence": None, "flag_visible": False}
     result = read_digit(crop)
     if result['value'] is None:
-        retry = read_digit(crop, threshold=195)
+        retry = read_digit(crop, threshold=165)
         # Un reintento no puede convertir trazos dudosos en un falso cero.
         if retry['status'] == 'read':
             result = {**retry, "status": "retried"}
