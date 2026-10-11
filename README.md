@@ -269,3 +269,17 @@ Se incluyen ocho formas de los números 1–5, extraídas de la captura inicial 
 Las rondas posteriores se reservan para validación: las nuevas referencias reconocen 20 de las 23 formas distintas que antes recurrían al OCR en esas rondas. Los recortes independientes de prueba incluyen una forma de 5 que sigue necesitando OCR, para verificar que la alternativa se conserva. Las capturas completas de la partida no se incluyen en el repositorio.
 
 Comparación antes/después con la misma caché y geometría validada en 15 capturas de tablero: llamadas a Tesseract 176 → 6; lectura 58,80 → 5,11 segundos (91 % menos); cero diferencias en las matrices y banderas. La medición excluye captura, clics, espera, detección de cuadrícula y cálculo del solver; no representa el tiempo total de una partida. 91 pruebas pasan.
+
+### Solver, pausa de clic y tiempo total
+
+La deducción representa cada grupo también como una máscara de bits para comprobar subconjuntos. Cada cierre de restricciones compara solo parejas que incluyen algún grupo nuevo y reutiliza los grupos derivados existentes, sin reconstruir complementos grandes repetidamente. Se conserva el orden de inserción y el límite de grupos. En las 24 matrices guardadas de una partida experta, el solver anterior y el nuevo producen exactamente las mismas deducciones; la comparación medida reduce 24,44 a 4,94 segundos.
+
+La pausa por clic pasa de aproximadamente 0,3 segundos (0,1 implícitos de PyAutoGUI más 0,2 explícitos) a 0,1 explícitos. Se desactiva solo la pausa implícita de esa llamada (`_pause=False`); las comprobaciones fail-safe de PyAutoGUI siguen activas. La comprobación de foco, las capturas entre aperturas, la espera estable después del lote y la verificación de acciones se mantienen. Para recuperar el ritmo anterior:
+
+```powershell
+python live.py --execute --loop --guess --click-delay 0.3 --output "..\live-game"
+```
+
+El mismo comando sin `--click-delay` usa 0,1 segundos. El ritmo nuevo se ha probado con adaptadores simulados, pendiente de validar los clics en la aplicación real.
+
+Cada llamada de clic se mide como `click` en `timings.json`, incluyendo su pausa. Al terminar, incluso por excepción, `summary.json` guarda el tiempo real transcurrido desde el inicio del motor (excluye la cuenta atrás inicial de cinco segundos), las llamadas al adaptador de clic y su tiempo acumulado. Incluye capturas, análisis, ejecución, escritura de archivos y posibles correcciones manuales. Las etapas individuales pueden solaparse y no deben sumarse para calcular el total. El resumen se muestra también en terminal. 97 pruebas pasan, incluyendo presupuestos de tiempo anidados, finalización tras error, pausas configurables y deducciones contrastadas con todas las distribuciones compatibles de 40 tableros pequeños.

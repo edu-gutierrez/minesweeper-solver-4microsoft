@@ -43,6 +43,8 @@ def deduce(board: Board, total_mines: int | None = None) -> Board:
         # Reunimos las deducciones antes de aplicarlas para detectar conflictos.
         proposals: dict[tuple[int, int], str] = {}
         constraints: dict[frozenset[tuple[int, int]], int] = {}
+        masks = {}
+        cells_by_mask = {}
 
         def add_constraint(cells, mines):
             cells = frozenset(cells)
@@ -54,6 +56,9 @@ def deduce(board: Board, total_mines: int | None = None) -> Board:
             # grupos derivados, conservando siempre las pistas originales.
             if cells:
                 constraints[cells] = mines
+                if cells not in masks:
+                    masks[cells] = sum(1 << (r*width+c) for r,c in cells)
+                    cells_by_mask[masks[cells]] = cells
 
         for r, row in enumerate(result):
             for c, number in enumerate(row):
@@ -82,20 +87,30 @@ def deduce(board: Board, total_mines: int | None = None) -> Board:
 
         # Si A está contenido en B, B - A contiene minas(B) - minas(A).
         # Los grupos derivados también pueden participar en nuevas restas.
+        compared_count = 0
         while True:
             previous_count = len(constraints)
-            groups = list(constraints.items())
-            for smaller, small_mines in groups:
-                for larger, large_mines in groups:
-                    if smaller < larger:
-                        difference = larger - smaller
+            groups = [(cells,mines,masks[cells],len(cells)) for cells,mines in constraints.items()]
+            for index,(smaller,small_mines,small_mask,small_size) in enumerate(groups):
+                # Las parejas entre grupos antiguos ya se comprobaron. Conserva
+                # el orden de las parejas nuevas y el límite de grupos original.
+                start = compared_count if index < compared_count else 0
+                for other in range(start,len(groups)):
+                    larger,large_mines,large_mask,large_size = groups[other]
+                    # Los bits hacen la comprobación de subconjunto sin recorrer
+                    # cientos de coordenadas de los complementos globales.
+                    if small_size < large_size and small_mask & large_mask == small_mask:
                         mines = large_mines - small_mines
-                        if group_limit is None or len(constraints) < group_limit or difference in constraints:
+                        difference = cells_by_mask.get(large_mask ^ small_mask)
+                        if difference is not None:
                             add_constraint(difference, mines)
-                        elif not 0 <= mines <= len(difference):
+                        elif group_limit is None or len(constraints) < group_limit:
+                            add_constraint(larger - smaller, mines)
+                        elif not 0 <= mines <= large_size-small_size:
                             raise ValueError("Restricción de minas incompatible.")
             if len(constraints) == previous_count:
                 break
+            compared_count = previous_count
 
         for unknown, remaining in constraints.items():
             if remaining == 0:

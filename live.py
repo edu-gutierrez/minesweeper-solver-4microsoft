@@ -6,6 +6,7 @@ from ctypes import wintypes
 import json
 import time
 import random
+import math
 from pathlib import Path
 
 import cv2
@@ -33,6 +34,14 @@ def play(capture, click, check_window, output, execute=False, loop=False, max_ro
     """Motor con adaptadores para probar el flujo sin controlar el ordenador."""
     output.mkdir(parents=True, exist_ok=True)
     timings = Timings(output/'timings.json')
+    try:
+        return _play(capture,click,check_window,output,execute,loop,max_rounds,
+                     counter_reader,guess,timings)
+    finally:
+        timings.finish()
+
+
+def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_reader,guess,timings):
     face_tracker=FaceTracker()
     original_capture = capture
     capture = lambda: timings.measure('capture',original_capture)
@@ -124,7 +133,7 @@ def play(capture, click, check_window, output, execute=False, loop=False, max_ro
                 if not target_is_covered(latest,action,grid):
                     print(f'Omitida fila {action["row"]}, columna {action["col"]}: ya no está tapada o está oculta.')
                     continue
-            click(action)
+            timings.measure('click',lambda:click(action))
         after = timings.measure('stability',lambda:wait_stable(capture,grid,tracker=face_tracker))
         cv2.imwrite(str(folder/'after.png'),after)
         outcome = timings.measure('outcome',lambda:detect_outcome(after,face_tracker))
@@ -161,7 +170,15 @@ def finish(output,reason,rounds):
     return result
 
 
-def run(output, execute=False, loop=False, max_rounds=200, guess=False):
+def click_on_screen(pyautogui,left,top,action,delay=.1):
+    """Una pausa explícita; conserva la comprobación fail-safe de PyAutoGUI."""
+    pyautogui.click(left+action['x'],top+action['y'],button=action['button'],_pause=False)
+    time.sleep(delay)
+
+
+def run(output, execute=False, loop=False, max_rounds=200, guess=False, click_delay=.1):
+    if not math.isfinite(click_delay) or click_delay < 0:
+        raise ValueError('La pausa entre clics debe ser finita y no negativa.')
     # Se carga solo al ejecutar en Windows, no al importar las pruebas.
     user32 = ctypes.windll.user32
     try:
@@ -188,8 +205,7 @@ def run(output, execute=False, loop=False, max_rounds=200, guess=False):
             raise RuntimeError('La ventana cambió de posición o perdió el foco; prueba detenida.')
         pyautogui.failSafeCheck()
     def click(action):
-        pyautogui.click(left+action['x'], top+action['y'], button=action['button'])
-        time.sleep(.2)
+        click_on_screen(pyautogui,left,top,action,click_delay)
     configure_tesseract()
     try:
         return play(capture,click,check_window,output,execute,loop,max_rounds,
@@ -207,9 +223,12 @@ if __name__ == '__main__':
     parser.add_argument('--loop',action='store_true',help='Repite el ciclo; requiere --execute.')
     parser.add_argument('--max-rounds',type=int,default=200)
     parser.add_argument('--guess',action='store_true',help='Apuesta por el menor riesgo cuando no hay jugadas seguras.')
+    parser.add_argument('--click-delay',type=float,default=.1,help='Pausa por clic en segundos (0.1 por defecto; 0.3 para el ritmo anterior).')
     args = parser.parse_args()
     if args.loop and not args.execute:
         parser.error('--loop requiere --execute.')
     if args.max_rounds < 1:
         parser.error('--max-rounds debe ser positivo.')
-    run(args.output,args.execute,args.loop,args.max_rounds,args.guess)
+    if not math.isfinite(args.click_delay) or args.click_delay < 0:
+        parser.error('--click-delay debe ser finito y no negativo.')
+    run(args.output,args.execute,args.loop,args.max_rounds,args.guess,args.click_delay)

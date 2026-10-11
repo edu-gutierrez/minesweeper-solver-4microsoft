@@ -1,9 +1,29 @@
 import unittest
+import random
 
 from solver import deduce, neighbors
 
 
 class SolverTests(unittest.TestCase):
+    def test_deductions_are_certain_under_all_compatible_small_board_assignments(self):
+        from probability import mine_probabilities
+        rng=random.Random(752)
+        for _ in range(40):
+            positions=set(range(12))
+            mines=set(rng.sample(sorted(positions),rng.randint(1,5)))
+            opened=set(rng.sample(sorted(positions-mines),rng.randint(1,min(5,12-len(mines)))))
+            board=[['?']*4 for _ in range(3)]
+            for pos in opened:
+                r,c=divmod(pos,4)
+                board[r][c]=sum(nr*4+nc in mines for nr,nc in neighbors(r,c,3,4))
+            risks=mine_probabilities(board,len(mines))
+            result=deduce(board,len(mines))
+            for (r,c),risk in risks.items():
+                if result[r][c]=='f':
+                    self.assertEqual(risk,1)
+                elif result[r][c]=='o':
+                    self.assertEqual(risk,0)
+
     def test_missing_mines_are_deduced(self):
         self.assertEqual(deduce([[3, "m"], ["?", "?"]]), [[3, "m"], ["f", "f"]])
 
