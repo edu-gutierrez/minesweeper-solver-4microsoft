@@ -13,6 +13,7 @@ import pytesseract
 from vision import detect_grid
 from digit_templates import match_digit
 from mine_templates import match_mine
+from treasure import match_chest
 
 
 def configure_tesseract():
@@ -101,6 +102,9 @@ def read_cell(crop, detected=True):
     mine = match_mine(crop)
     if mine:
         return mine
+    chest = match_chest(crop)
+    if chest:
+        return chest
     if not detected:
         dark = brightness < 100
         if np.mean(dark) > 0.95:

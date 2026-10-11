@@ -21,6 +21,7 @@ from profiling import Timings
 from mine_counter import read_remaining_mines
 from probability import mine_probabilities, ProbabilityLimit
 from certainty import find_certainties
+from treasure import read_mode, read_lives, choose_guess
 
 
 def window_rect(user32, hwnd):
@@ -31,18 +32,19 @@ def window_rect(user32, hwnd):
 
 
 def play(capture, click, check_window, output, execute=False, loop=False, max_rounds=200,
-         counter_reader=None, guess=False):
+         counter_reader=None, guess=False, mode_reader=None, lives_reader=None):
     """Motor con adaptadores para probar el flujo sin controlar el ordenador."""
     output.mkdir(parents=True, exist_ok=True)
     timings = Timings(output/'timings.json')
     try:
         return _play(capture,click,check_window,output,execute,loop,max_rounds,
-                     counter_reader,guess,timings)
+                     counter_reader,guess,timings,mode_reader,lives_reader)
     finally:
         timings.finish()
 
 
-def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_reader,guess,timings):
+def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_reader,guess,timings,
+          mode_reader=None,lives_reader=None):
     face_tracker=FaceTracker()
     original_capture = capture
     capture = lambda: timings.measure('capture',original_capture)
@@ -50,6 +52,23 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
     reading = None
     grid = None
     total_mines = None
+    mode = None
+    lives = None
+
+    def get_lives(frame):
+        try:
+            value = timings.measure('lives',lambda:(lives_reader or read_lives)(frame))
+        except ValueError as error:
+            print(error)
+            value = int(input('Vidas restantes: '))
+            print('Devuelve el foco a Minesweeper en 5 segundos.')
+            time.sleep(5)
+        if type(value) is not int or value<0:
+            raise ValueError('Las vidas deben ser un entero no negativo.')
+        return value
+
+    def save_mode():
+        (output/'mode.json').write_text(json.dumps({'mode':mode,'lives':lives},indent=2),encoding='utf-8')
     for turn in range(1, (max_rounds if loop else 1)+1):
         folder = output / f'round-{turn:03d}'
         folder.mkdir(parents=True,exist_ok=True)
@@ -57,6 +76,24 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
         outcome = timings.measure('outcome',lambda:detect_outcome(image,face_tracker))
         if outcome:
             return finish(output,outcome,turn-1)
+        if mode is None:
+            try:
+                mode = timings.measure('mode',lambda:mode_reader(image)) if mode_reader else 'classic'
+            except ValueError as error:
+                print(error)
+                answer=input('Modo (clasico/tesoro): ').strip().lower()
+                mode={'clasico':'classic','clásico':'classic','classic':'classic',
+                      'tesoro':'treasure','treasure':'treasure'}.get(answer)
+                print('Devuelve el foco a Minesweeper en 5 segundos.')
+                time.sleep(5)
+            if mode not in ('classic','treasure'):
+                raise ValueError('Modo no compatible; selecciona clásico o tesoro.')
+            if mode=='treasure':
+                lives=get_lives(image)
+            save_mode()
+            print(f'Modo: {mode}'+(f'; vidas: {lives}.' if mode=='treasure' else '.'))
+        if mode=='treasure' and lives==0:
+            return finish(output,'lives_exhausted',turn-1)
         if reading is None:
             grid = timings.measure('grid',lambda:detect_grid(image))
             reading = timings.measure('reading',lambda:read_board(image,grid))
@@ -105,18 +142,18 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
                     solved[r][c] = 'o' if risk==0 else 'f'
             plan = plan_actions(reading['board'],solved,reading['flags_visible'],grid)
             if not plan and risks:
-                lowest = min(risks.values())
-                candidates = sorted(pos for pos,risk in risks.items() if risk==lowest)
-                r,c = random.choice(candidates)
+                (r,c),strategy=choose_guess(solved,risks,mode,lives)
+                lowest=risks[(r,c)]
                 plan = [{'row':r+1,'col':c+1,'x':round(grid['x_centers'][c]),
                          'y':round(grid['y_centers'][r]),'button':'left',
-                         'guess':True,'mine_probability':float(lowest)}]
-                print(f'Apuesta: fila {r+1}, columna {c+1}; riesgo de mina {float(lowest):.1%}.')
+                         'guess':True,'mine_probability':float(lowest),'strategy':strategy}]
+                print(f'Apuesta: fila {r+1}, columna {c+1}; riesgo de mina {float(lowest):.1%}; {strategy}.')
             (folder/'probabilities.json').write_text(json.dumps([
                 {'row':r+1,'col':c+1,'mine_probability':float(risk),
                  'fraction':str(risk)} for (r,c),risk in sorted(risks.items())
             ],indent=2),encoding='utf-8')
-        (folder/'plan.json').write_text(json.dumps({'reading':reading,'grid':grid,'actions':plan},indent=2),encoding='utf-8')
+        (folder/'plan.json').write_text(json.dumps({'reading':reading,'grid':grid,'actions':plan,
+                                                  'mode':mode,'lives':lives},indent=2),encoding='utf-8')
         cv2.imwrite(str(folder/'plan.png'),draw_deductions(image,grid,reading['board'],solved))
         print(f'Ronda {turn}: {sum(a["button"]=="right" for a in plan)} banderas y {sum(a["button"]=="left" for a in plan)} apertura.')
         timings.report()
@@ -159,11 +196,16 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
         if updated.get('manual_corrections'):
             print('Corrección recibida. Devuelve el foco a Minesweeper en 5 segundos.')
             time.sleep(5)
+        if mode=='treasure' and any(value=='m' and reading['board'][r][c]!='m'
+                                    for r,row in enumerate(updated['board']) for c,value in enumerate(row)):
+            lives=get_lives(after)
+            save_mode()
+            print(f'Vidas restantes: {lives}.')
         failures = []
         for action in plan:
             r,c = action['row']-1,action['col']-1
             value = updated['board'][r][c]
-            valid = updated['flags_visible'][r][c] if action['button']=='right' else (type(value) is int or value=='m')
+            valid = updated['flags_visible'][r][c] if action['button']=='right' else (type(value) is int or value in ('m','t'))
             if action['button']=='left' and value=='m':
                 print(f'Mina revelada: fila {r+1}, columna {c+1}; la partida sigue activa.')
             if not valid:
@@ -222,7 +264,7 @@ def run(output, execute=False, loop=False, max_rounds=200, guess=False, click_de
     configure_tesseract()
     try:
         return play(capture,click,check_window,output,execute,loop,max_rounds,
-                    counter_reader=read_remaining_mines,guess=guess)
+                    counter_reader=read_remaining_mines,guess=guess,mode_reader=read_mode,lives_reader=read_lives)
     except (RuntimeError,ValueError,EOFError,pyautogui.FailSafeException) as error:
         output.mkdir(parents=True,exist_ok=True)
         (output/'result.json').write_text(json.dumps({'reason':'error','message':str(error)},indent=2),encoding='utf-8')

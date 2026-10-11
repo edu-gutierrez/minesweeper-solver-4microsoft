@@ -37,6 +37,8 @@ def mine_probabilities(board, total_mines, max_nodes=250_000, timeout=2.0):
     constraints = {}
     for r,row in enumerate(board):
         for c,value in enumerate(row):
+            if value == 't':
+                value = 8
             if type(value) is not int:
                 continue
             adjacent = list(neighbors(r,c,height,width))

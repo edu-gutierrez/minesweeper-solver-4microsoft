@@ -20,6 +20,8 @@ def find_certainties(board, total_mines=None, timeout=6.0):
     rows, totals = [], []
     for r,row in enumerate(board):
         for c,value in enumerate(row):
+            if value == 't':
+                value = 8
             if type(value) is not int:
                 continue
             adjacent = list(neighbors(r,c,len(board),len(row)))

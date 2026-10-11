@@ -21,7 +21,7 @@ def validate(board: Board) -> None:
             raise ValueError("Todas las filas deben tener el mismo tamaño.")
         for cell in row:
             is_number = type(cell) is int and 0 <= cell <= 8
-            is_symbol = isinstance(cell, str) and cell in {"?", "m", "f", "b", "o"}
+            is_symbol = isinstance(cell, str) and cell in {"?", "m", "f", "b", "o", "t"}
             if not (is_number or is_symbol):
                 raise ValueError(f"Estado de casilla inválido: {cell!r}")
 
@@ -62,6 +62,8 @@ def deduce(board: Board, total_mines: int | None = None) -> Board:
 
         for r, row in enumerate(result):
             for c, number in enumerate(row):
+                if number == 't':
+                    number = 8
                 if type(number) is not int:
                     continue
                 known_mines = 0

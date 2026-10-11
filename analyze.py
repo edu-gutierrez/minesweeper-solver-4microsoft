@@ -27,10 +27,10 @@ def correct_uncertain(image, grid, result, folder, input_fn=input):
             cv2.imwrite(str(path), cv2.resize(crop, None, fx=6, fy=6, interpolation=cv2.INTER_NEAREST))
             print(f'Casilla dudosa: fila {r+1}, columna {c+1}. Recorte: {path.resolve()}')
             while True:
-                answer = input_fn('Valor (0-8, ?, f, m, b; q para cancelar): ').strip().lower()
+                answer = input_fn('Valor (0-8, ?, f, m, b, t=tesoro; q para cancelar): ').strip().lower()
                 if answer == 'q':
                     raise RuntimeError('Análisis cancelado: no se ejecutará el solver.')
-                if answer in list('012345678') + ['?', 'f', 'm', 'b']:
+                if answer in list('012345678') + ['?', 'f', 'm', 'b', 't']:
                     break
                 print('Valor inválido.')
             cell = int(answer) if answer.isdigit() else answer
