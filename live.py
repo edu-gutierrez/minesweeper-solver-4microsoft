@@ -5,6 +5,7 @@ import ctypes
 from ctypes import wintypes
 import json
 import time
+import random
 from pathlib import Path
 
 import cv2
@@ -17,6 +18,7 @@ from vision import detect_grid
 from game_state import detect_outcome, wait_stable, stability_region, similar, has_sunglasses, possible_result_dialog, FaceTracker
 from profiling import Timings
 from mine_counter import read_remaining_mines
+from probability import mine_probabilities, ProbabilityLimit
 
 
 def window_rect(user32, hwnd):
@@ -27,7 +29,7 @@ def window_rect(user32, hwnd):
 
 
 def play(capture, click, check_window, output, execute=False, loop=False, max_rounds=200,
-         counter_reader=None):
+         counter_reader=None, guess=False):
     """Motor con adaptadores para probar el flujo sin controlar el ordenador."""
     output.mkdir(parents=True, exist_ok=True)
     timings = Timings(output/'timings.json')
@@ -69,6 +71,31 @@ def play(capture, click, check_window, output, execute=False, loop=False, max_ro
             print(f'Total de minas: {total_mines}. Contador leído solo al inicio.')
         solved = timings.measure('deduction',lambda:solve_reading(reading,total_mines=total_mines))
         plan = plan_actions(reading['board'],solved,reading['flags_visible'],grid)
+        if not plan and guess:
+            if total_mines is None:
+                raise ValueError('Para apostar se requiere el total inicial de minas.')
+            try:
+                risks = timings.measure('probability',lambda:mine_probabilities(solved,total_mines))
+            except ProbabilityLimit as error:
+                print(error)
+                return finish(output,'probability_limit',turn)
+            # La enumeración puede encontrar certezas que las restas no encontraron.
+            for (r,c),risk in risks.items():
+                if risk in (0,1):
+                    solved[r][c] = 'o' if risk==0 else 'f'
+            plan = plan_actions(reading['board'],solved,reading['flags_visible'],grid)
+            if not plan and risks:
+                lowest = min(risks.values())
+                candidates = sorted(pos for pos,risk in risks.items() if risk==lowest)
+                r,c = random.choice(candidates)
+                plan = [{'row':r+1,'col':c+1,'x':round(grid['x_centers'][c]),
+                         'y':round(grid['y_centers'][r]),'button':'left',
+                         'guess':True,'mine_probability':float(lowest)}]
+                print(f'Apuesta: fila {r+1}, columna {c+1}; riesgo de mina {float(lowest):.1%}.')
+            (folder/'probabilities.json').write_text(json.dumps([
+                {'row':r+1,'col':c+1,'mine_probability':float(risk),
+                 'fraction':str(risk)} for (r,c),risk in sorted(risks.items())
+            ],indent=2),encoding='utf-8')
         (folder/'plan.json').write_text(json.dumps({'reading':reading,'grid':grid,'actions':plan},indent=2),encoding='utf-8')
         cv2.imwrite(str(folder/'plan.png'),draw_deductions(image,grid,reading['board'],solved))
         print(f'Ronda {turn}: {sum(a["button"]=="right" for a in plan)} banderas y {sum(a["button"]=="left" for a in plan)} apertura.')
@@ -134,7 +161,7 @@ def finish(output,reason,rounds):
     return result
 
 
-def run(output, execute=False, loop=False, max_rounds=200):
+def run(output, execute=False, loop=False, max_rounds=200, guess=False):
     # Se carga solo al ejecutar en Windows, no al importar las pruebas.
     user32 = ctypes.windll.user32
     try:
@@ -166,7 +193,7 @@ def run(output, execute=False, loop=False, max_rounds=200):
     configure_tesseract()
     try:
         return play(capture,click,check_window,output,execute,loop,max_rounds,
-                    counter_reader=read_remaining_mines)
+                    counter_reader=read_remaining_mines,guess=guess)
     except (RuntimeError,ValueError,EOFError,pyautogui.FailSafeException) as error:
         output.mkdir(parents=True,exist_ok=True)
         (output/'result.json').write_text(json.dumps({'reason':'error','message':str(error)},indent=2),encoding='utf-8')
@@ -179,9 +206,10 @@ if __name__ == '__main__':
     parser.add_argument('--output',type=Path,default=Path('live-test'))
     parser.add_argument('--loop',action='store_true',help='Repite el ciclo; requiere --execute.')
     parser.add_argument('--max-rounds',type=int,default=200)
+    parser.add_argument('--guess',action='store_true',help='Apuesta por el menor riesgo cuando no hay jugadas seguras.')
     args = parser.parse_args()
     if args.loop and not args.execute:
         parser.error('--loop requiere --execute.')
     if args.max_rounds < 1:
         parser.error('--max-rounds debe ser positivo.')
-    run(args.output,args.execute,args.loop,args.max_rounds)
+    run(args.output,args.execute,args.loop,args.max_rounds,args.guess)

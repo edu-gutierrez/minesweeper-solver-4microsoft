@@ -242,4 +242,14 @@ La mejora del tiempo de partida completo queda pendiente de medir en vivo.
 
 Al iniciar `live.py`, se lee una sola vez el contador y se suman las banderas visibles para recuperar el total de minas. Se guarda en `mines.json`. En cada deducción se resta el número de minas confirmadas (`f` y `m`); no se vuelve a consultar el contador de pantalla. Si el OCR inicial es dudoso, el programa pide introducir su valor por terminal. Las banderas iniciales deben ser correctas.
 
-El total se usa como restricción global junto con las pistas locales y las restas de subconjuntos. Permite abrir los complementos sin minas o marcar los complementos llenos de minas. Para limitar el coste, la combinación con el total genera como máximo 512 grupos (o el número de pistas originales si es mayor); esto puede dejar deducciones sin encontrar, pero no justifica apuestas. No calcula probabilidades ni hace clics aleatorios. La región del contador corresponde al tema clásico de las capturas proporcionadas; otras distribuciones de la interfaz no están validadas.
+El total se usa como restricción global junto con las pistas locales y las restas de subconjuntos. Permite abrir los complementos sin minas o marcar los complementos llenos de minas. Para limitar el coste, la combinación con el total genera como máximo 512 grupos (o el número de pistas originales si es mayor); esto puede dejar deducciones sin encontrar, pero no justifica apuestas. Sin `--guess`, no calcula probabilidades ni hace clics aleatorios. La región del contador corresponde al tema clásico de las capturas proporcionadas; otras distribuciones de la interfaz no están validadas.
+
+### Continuar cuando no quedan movimientos seguros
+
+```powershell
+python live.py --execute --loop --guess --output "..\live-game"
+```
+
+`--guess` enumera las distribuciones compatibles con las pistas y el total inicial cuando las reglas de deducción se atascan. Combina componentes independientes y pondera las casillas sin pistas por el número de combinaciones de minas posibles. Primero ejecuta las certezas que encuentre (riesgo 0 o 1). Si no hay certezas, abre una sola casilla con el menor riesgo de mina; los empates se eligen al azar. Un 50/50 sigue pudiendo perder. Se muestra el riesgo en terminal y se guarda `probabilities.json` en la carpeta de la ronda.
+
+El cálculo exacto tiene un límite de 2 segundos, 250.000 nodos de búsqueda y 100 casillas por componente. Si excede un límite, termina con `probability_limit` y no apuesta con resultados parciales. Sin `--guess`, sigue parando con `no_safe_moves`. Las probabilidades suponen que todas las distribuciones compatibles tienen igual peso y que las banderas iniciales son correctas.

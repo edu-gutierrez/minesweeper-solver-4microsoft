@@ -23,6 +23,6 @@ class Timings:
 
     def report(self):
         labels = {'capture':'captura', 'stability':'espera (incluye capturas)',
-                  'outcome':'mensaje final', 'grid':'cuadrícula', 'reading':'lectura', 'deduction':'deducción', 'face_check':'emoji entre clics'}
+                  'outcome':'mensaje final', 'grid':'cuadrícula', 'reading':'lectura', 'deduction':'deducción', 'face_check':'emoji entre clics', 'probability':'probabilidades'}
         print('Tiempos de la última llamada: ' + ', '.join(
             f'{labels.get(name,name)} {item["last_seconds"]:.2f}s' for name,item in self.stages.items()))
