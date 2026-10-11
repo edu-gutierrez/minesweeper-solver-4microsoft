@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 
 import cv2
 import numpy as np
@@ -42,6 +43,18 @@ class FlagTests(unittest.TestCase):
         self.assertEqual(result['value'], 'f')
         self.assertTrue(result['flag_visible'])
 
+    def test_flag_without_contour_is_read_without_digit_ocr(self):
+        with patch('ocr.read_digit') as digit_ocr:
+            result = read_cell(self.flag_crop(), detected=False)
+        self.assertEqual(result['value'], 'f')
+        self.assertTrue(result['flag_visible'])
+        digit_ocr.assert_not_called()
+
+    def test_missing_contour_keeps_holes_and_uncertain_backgrounds(self):
+        self.assertEqual(read_cell(np.zeros((27,27,3),dtype=np.uint8),detected=False)['value'],'b')
+        yellow=np.full((27,27,3),(0,210,255),dtype=np.uint8)
+        self.assertIsNone(read_cell(yellow,detected=False)['value'])
+
     def test_other_backgrounds_and_plain_yellow_are_not_flags(self):
         for color in ((0, 210, 255), (245, 190, 75), (50, 220, 170), (255, 255, 255)):
             self.assertFalse(is_flag(np.full((27, 27, 3), color, dtype=np.uint8)))
@@ -58,3 +71,7 @@ class FlagTests(unittest.TestCase):
         result = read_board(image, grid)
         self.assertEqual(result['board'], [['f']])
         self.assertEqual(result['flags_visible'], [[True]])
+        grid['detected']=[[False]]
+        result=read_board(image,grid)
+        self.assertEqual(result['board'],[['f']])
+        self.assertEqual(result['flags_visible'],[[True]])

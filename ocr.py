@@ -93,14 +93,15 @@ def read_cell(crop, detected=True):
     marked = (hue >= 30) & (hue <= 50) & (saturation > 100) & (brightness > 140)
     if np.mean(blue) > 0.65 or np.mean(marked) > 0.65:
         return {"value": "?", "status": "covered", "confidence": None, "flag_visible": False}
+    if is_flag(crop):
+        # La cuadrícula ya reconstruyó esta posición: reconocer la bandera no
+        # requiere que Canny haya encontrado el borde de la casilla.
+        return {"value": "f", "status": "flag", "confidence": None, "flag_visible": True}
     if not detected:
         dark = brightness < 100
         if np.mean(dark) > 0.95:
             return {"value": "b", "status": "hole", "confidence": None, "flag_visible": False}
         return {"value": None, "status": "uncertain", "confidence": None, "flag_visible": False}
-    if is_flag(crop):
-        # El usuario confirmó que las banderas iniciales del desafío son fiables.
-        return {"value": "f", "status": "flag", "confidence": None, "flag_visible": True}
     result = read_digit(crop)
     if result['value'] is None:
         retry = read_digit(crop, threshold=165)
