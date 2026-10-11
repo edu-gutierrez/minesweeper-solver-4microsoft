@@ -132,7 +132,7 @@ def read_board(image, grid, previous_image=None, previous_grid=None, previous_re
         for c, x in enumerate(grid["x_centers"]):
             crop = image[round(y)-half:round(y)+half+1, round(x)-half:round(x)+half+1]
             result = None
-            if cache_ok and grid['detected'][r][c] == previous_grid['detected'][r][c]:
+            if cache_ok:
                 old = previous_reading['details'][r][c]
                 old_crop = previous_image[round(y)-half:round(y)+half+1, round(x)-half:round(x)+half+1]
                 if old.get('value') is not None and old.get('status') not in ('manual', 'uncertain', 'unclassified') and np.array_equal(crop, old_crop):

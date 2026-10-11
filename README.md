@@ -253,3 +253,11 @@ python live.py --execute --loop --guess --output "..\live-game"
 `--guess` enumera las distribuciones compatibles con las pistas y el total inicial cuando las reglas de deducción se atascan. Combina componentes independientes y pondera las casillas sin pistas por el número de combinaciones de minas posibles. Primero ejecuta las certezas que encuentre (riesgo 0 o 1). Si no hay certezas, abre una sola casilla con el menor riesgo de mina; los empates se eligen al azar. Un 50/50 sigue pudiendo perder. Se muestra el riesgo en terminal y se guarda `probabilities.json` en la carpeta de la ronda.
 
 El cálculo exacto tiene un límite de 2 segundos, 250.000 nodos de búsqueda y 100 casillas por componente. Si excede un límite, termina con `probability_limit` y no apuesta con resultados parciales. Sin `--guess`, sigue parando con `no_safe_moves`. Las probabilidades suponen que todas las distribuciones compatibles tienen igual peso y que las banderas iniciales son correctas.
+
+### Cuadrícula estable durante una partida
+
+El jugador conserva los centros y el tamaño de recorte calibrados al inicio. Después de cada lote, detecta los nuevos contornos y valida que las dimensiones coincidan, que la estimación no se aleje más de 3 píxeles y que al menos tres teselas completas (incluidos sus bordes) permanezcan idénticas en las coordenadas originales. Si falta evidencia de alineación o cambia el tamaño de la captura, se detiene para recalibrar iniciando de nuevo. Esta validación puede detenerse de forma conservadora si cambian todas las teselas.
+
+Una vez validada la geometría, cada casilla se reutiliza solo si sus píxeles interiores son idénticos y su lectura anterior era automática y válida. Los cambios de la máscara de contornos no invalidan esas lecturas. Las correcciones manuales y lecturas dudosas se vuelven a analizar. No se vuelve a detectar una captura que ya fue validada y leída al final de la ronda anterior.
+
+Validación con 22 capturas posteriores de una partida experta 30x16: cero diferencias frente a las matrices guardadas y 54,32 segundos de lectura en la reproducción, frente a unos 172,78 segundos registrados para esas lecturas en la ejecución anterior. Son mediciones de lectura de capturas guardadas, no de una nueva partida completa.

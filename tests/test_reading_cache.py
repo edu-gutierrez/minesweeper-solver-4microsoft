@@ -64,3 +64,11 @@ class ReadingCacheTests(unittest.TestCase):
             result=self.read(new)
             self.assertEqual(recognizer.call_count,2)
         self.assertEqual(result['board'],[['?','?']])
+
+    def test_contour_mask_changes_do_not_discard_identical_valid_pixels(self):
+        grid=copy.deepcopy(self.grid)
+        grid['detected']=[[False,False]]
+        with patch('ocr.read_cell') as recognizer:
+            result=self.read(self.image,grid)
+        recognizer.assert_not_called()
+        self.assertEqual(result['board'],[[1,2]])

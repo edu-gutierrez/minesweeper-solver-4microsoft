@@ -1,6 +1,7 @@
 """Localiza una cuadrícula por sus contornos, sin reconocer aún sus estados."""
 
 import argparse
+import copy
 import json
 from pathlib import Path
 
@@ -108,6 +109,42 @@ def draw_grid(image, grid):
     cv2.putText(output, f'{grid["rows"]} x {grid["cols"]} | detected: {grid["detected_count"]}',
                 (20, image.shape[0] - 25), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 220, 0), 2)
     return output
+
+
+def keep_grid_geometry(reference, observed, previous_image, image):
+    """Valida la alineación y conserva la calibración inicial durante la partida.
+
+    Los parámetros de contornos pueden oscilar; además comprobamos teselas
+    completas idénticas, incluidos sus bordes, en las coordenadas originales.
+    Si no hay evidencia suficiente de alineación, detenemos para recalibrar.
+    """
+    if previous_image.shape != image.shape:
+        raise RuntimeError('El tamaño de la captura cambió; reinicia para recalibrar.')
+    if (reference['rows'],reference['cols']) != (observed['rows'],observed['cols']):
+        raise RuntimeError('La cuadrícula cambió; reinicia para recalibrar.')
+    if abs(reference['cell_size']-observed['cell_size']) > 3:
+        raise RuntimeError('El tamaño de las casillas cambió; reinicia para recalibrar.')
+    for axis in ('x_centers','y_centers'):
+        if len(reference[axis]) != len(observed[axis]) or any(
+            abs(a-b)>3 for a,b in zip(reference[axis],observed[axis])
+        ):
+            raise RuntimeError('El tablero cambió de posición; reinicia para recalibrar.')
+    half=round(reference['cell_size']*.5)
+    unchanged=0
+    required=min(3,reference['rows']*reference['cols'])
+    for y in reference['y_centers']:
+        for x in reference['x_centers']:
+            x,y=round(x),round(y)
+            before=previous_image[max(0,y-half):y+half+1,max(0,x-half):x+half+1]
+            after=image[max(0,y-half):y+half+1,max(0,x-half):x+half+1]
+            if before.size and np.array_equal(before,after):
+                unchanged+=1
+                if unchanged>=required:
+                    result=copy.deepcopy(reference)
+                    result['detected']=copy.deepcopy(observed['detected'])
+                    result['detected_count']=observed.get('detected_count',sum(map(sum,observed['detected'])))
+                    return result
+    raise RuntimeError('No se pudo confirmar la alineación del tablero; reinicia para recalibrar.')
 
 
 if __name__ == "__main__":

@@ -14,7 +14,7 @@ import numpy as np
 from actions import plan_actions, target_is_covered
 from analyze import correct_uncertain, solve_reading, draw_deductions
 from ocr import configure_tesseract, read_board
-from vision import detect_grid
+from vision import detect_grid, keep_grid_geometry
 from game_state import detect_outcome, wait_stable, stability_region, similar, has_sunglasses, possible_result_dialog, FaceTracker
 from profiling import Timings
 from mine_counter import read_remaining_mines
@@ -38,6 +38,7 @@ def play(capture, click, check_window, output, execute=False, loop=False, max_ro
     capture = lambda: timings.measure('capture',original_capture)
     image = timings.measure('stability',lambda:wait_stable(capture,tracker=face_tracker))
     reading = None
+    grid = None
     total_mines = None
     for turn in range(1, (max_rounds if loop else 1)+1):
         folder = output / f'round-{turn:03d}'
@@ -46,8 +47,8 @@ def play(capture, click, check_window, output, execute=False, loop=False, max_ro
         outcome = timings.measure('outcome',lambda:detect_outcome(image,face_tracker))
         if outcome:
             return finish(output,outcome,turn-1)
-        grid = timings.measure('grid',lambda:detect_grid(image))
         if reading is None:
+            grid = timings.measure('grid',lambda:detect_grid(image))
             reading = timings.measure('reading',lambda:read_board(image,grid))
         correct_uncertain(image,grid,reading,folder/'corrections')
         if reading.get('manual_corrections'):
@@ -130,8 +131,7 @@ def play(capture, click, check_window, output, execute=False, loop=False, max_ro
         if outcome:
             return finish(output,outcome,turn)
         after_grid = timings.measure('grid',lambda:detect_grid(after))
-        if (after_grid['rows'],after_grid['cols']) != (grid['rows'],grid['cols']):
-            raise RuntimeError('La cuadrícula cambió; ejecución detenida.')
+        after_grid = keep_grid_geometry(grid,after_grid,image,after)
         updated = timings.measure('reading',lambda:read_board(
             after,after_grid,previous_image=image,previous_grid=grid,previous_reading=reading))
         stats = updated.get('reuse_stats',{})
@@ -150,7 +150,7 @@ def play(capture, click, check_window, output, execute=False, loop=False, max_ro
         if failures:
             raise RuntimeError('No se verificaron todas las acciones; no se repetirán automáticamente.')
         print('Acciones verificadas.')
-        image,reading = after,updated
+        image,reading,grid = after,updated,after_grid
     return finish(output,'round_limit' if loop else 'single_round',turn)
 
 

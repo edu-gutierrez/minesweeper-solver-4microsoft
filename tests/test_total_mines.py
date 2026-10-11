@@ -36,6 +36,7 @@ class TotalMinesTests(unittest.TestCase):
     def test_initial_flags_added_and_counter_read_once_across_rounds(self):
         frame=np.zeros((60,60,3),dtype=np.uint8)
         grid={'rows':1,'cols':3,'cell_size':10,'x_centers':[10,30,50],'y_centers':[20]}
+        grid['detected']=[[True]*3]
         first={'board':[['f',0,'?']],'flags_visible':[[True,False,False]],'details':[[{},{},{}]]}
         after={'board':[['f',0,0]],'flags_visible':[[True,False,False]],'details':[[{},{},{}]]}
         counter=Mock(return_value=0)

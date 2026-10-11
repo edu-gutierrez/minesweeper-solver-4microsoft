@@ -51,6 +51,7 @@ class LoopTests(unittest.TestCase):
     def test_batch_skips_auto_revealed_cell_and_reads_once_after_batch(self):
         frame=np.zeros((60,60,3),dtype=np.uint8)
         grid={'rows':2,'cols':2,'cell_size':10,'x_centers':[20,40],'y_centers':[20,40]}
+        grid['detected']=[[True]*2 for _ in range(2)]
         first={'board':[[0,'?'],['?','?']],'flags_visible':[[False]*2 for _ in range(2)],'details':[[{},{}],[{},{}]]}
         after={'board':[[0,0],[0,0]],'flags_visible':[[False]*2 for _ in range(2)],'details':[[{},{}],[{},{}]]}
         with tempfile.TemporaryDirectory() as folder, \
@@ -67,12 +68,13 @@ class LoopTests(unittest.TestCase):
     def test_loop_reuses_updated_board_and_stops_on_loss(self):
         frame=np.zeros((60,60,3),dtype=np.uint8)
         grid={'rows':1,'cols':3,'cell_size':10,'x_centers':[10,30,50],'y_centers':[20]}
+        grid['detected']=[[True]*3]
         first={'board':[[0,'?','?']],'flags_visible':[[False]*3],'details':[[{}, {}, {}]]}
         second={'board':[[0,0,'?']],'flags_visible':[[False]*3],'details':[[{}, {}, {}]]}
         with tempfile.TemporaryDirectory() as folder, \
              patch('live.wait_stable',return_value=frame), \
              patch('live.detect_outcome',side_effect=[None,None,None,'lost']), \
-             patch('live.detect_grid',return_value=grid), \
+             patch('live.detect_grid',return_value=grid) as detector, \
              patch('live.read_board',side_effect=[first,second]) as read, \
              patch('live.target_is_covered',return_value=True):
             actions=[]
@@ -80,6 +82,7 @@ class LoopTests(unittest.TestCase):
             self.assertEqual(result['reason'],'lost')
             self.assertEqual([a['col'] for a in actions],[2,3])
             self.assertEqual(read.call_count,2)
+            self.assertEqual(detector.call_count,2)
 
     def test_existing_result_never_reads_or_clicks(self):
         for outcome in ('won','lost'):
