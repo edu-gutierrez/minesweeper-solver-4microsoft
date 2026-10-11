@@ -1,0 +1,42 @@
+[
+  {
+    "file": "3-holdout.png",
+    "value": 3,
+    "template": true,
+    "source_frame": "after-007",
+    "row": 3,
+    "col": 2
+  },
+  {
+    "file": "2-holdout.png",
+    "value": 2,
+    "template": true,
+    "source_frame": "after-007",
+    "row": 3,
+    "col": 11
+  },
+  {
+    "file": "1-holdout.png",
+    "value": 1,
+    "template": true,
+    "source_frame": "after-008",
+    "row": 5,
+    "col": 29
+  },
+  {
+    "file": "4-holdout.png",
+    "value": 4,
+    "template": true,
+    "source_frame": "after-008",
+    "row": 13,
+    "col": 7
+  },
+  {
+    "file": "5-holdout.png",
+    "value": 5,
+    "template": false,
+    "source_frame": "after-009",
+    "row": 14,
+    "col": 11
+  }
+]

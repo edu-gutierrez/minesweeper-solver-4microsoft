@@ -1,0 +1,74 @@
+[
+  {
+    "file": "3-expert-1.png",
+    "value": 3,
+    "source": "classic-30x16",
+    "frame": "after-001",
+    "row": 11,
+    "col": 21,
+    "reviewed_visually": true
+  },
+  {
+    "file": "2-expert-1.png",
+    "value": 2,
+    "source": "classic-30x16",
+    "frame": "after-001",
+    "row": 6,
+    "col": 22,
+    "reviewed_visually": true
+  },
+  {
+    "file": "1-expert-1.png",
+    "value": 1,
+    "source": "classic-30x16",
+    "frame": "initial",
+    "row": 11,
+    "col": 18,
+    "reviewed_visually": true
+  },
+  {
+    "file": "2-expert-2.png",
+    "value": 2,
+    "source": "classic-30x16",
+    "frame": "after-005",
+    "row": 5,
+    "col": 10,
+    "reviewed_visually": true
+  },
+  {
+    "file": "1-expert-2.png",
+    "value": 1,
+    "source": "classic-30x16",
+    "frame": "after-004",
+    "row": 9,
+    "col": 25,
+    "reviewed_visually": true
+  },
+  {
+    "file": "3-expert-2.png",
+    "value": 3,
+    "source": "classic-30x16",
+    "frame": "after-002",
+    "row": 5,
+    "col": 20,
+    "reviewed_visually": true
+  },
+  {
+    "file": "4-expert-1.png",
+    "value": 4,
+    "source": "classic-30x16",
+    "frame": "after-002",
+    "row": 12,
+    "col": 21,
+    "reviewed_visually": true
+  },
+  {
+    "file": "5-expert-1.png",
+    "value": 5,
+    "source": "classic-30x16",
+    "frame": "after-006",
+    "row": 11,
+    "col": 7,
+    "reviewed_visually": true
+  }
+]

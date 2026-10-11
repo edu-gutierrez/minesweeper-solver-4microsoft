@@ -1,4 +1,5 @@
 import unittest
+import json
 from pathlib import Path
 from unittest.mock import patch
 
@@ -10,6 +11,24 @@ from ocr import read_digit
 
 
 class DigitTemplateTests(unittest.TestCase):
+    def test_real_expert_digits_from_frames_not_used_as_templates(self):
+        folder=Path(__file__).parent/'fixtures'/'expert-digits'
+        samples=json.loads((folder/'sources.json').read_text())
+        for sample in samples:
+            with self.subTest(digit=sample['value']):
+                crop=cv2.imread(str(folder/sample['file']))
+                with patch('ocr.pytesseract.image_to_data',return_value={
+                    'text':[str(sample['value'])], 'conf':[96]
+                }) as engine:
+                    result=read_digit(crop)
+                self.assertEqual(result['value'],sample['value'])
+                if sample['template']:
+                    self.assertEqual(result['status'],'template')
+                    engine.assert_not_called()
+                else:
+                    self.assertEqual(result['status'],'read')
+                    self.assertEqual(engine.call_count,2)
+
     def test_known_digits_at_multiple_scales(self):
         folder=Path(__file__).resolve().parents[1]/'assets'/'digits'
         for path in folder.glob('*.png'):

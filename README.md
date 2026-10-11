@@ -261,3 +261,11 @@ El jugador conserva los centros y el tamaño de recorte calibrados al inicio. De
 Una vez validada la geometría, cada casilla se reutiliza solo si sus píxeles interiores son idénticos y su lectura anterior era automática y válida. Los cambios de la máscara de contornos no invalidan esas lecturas. Las correcciones manuales y lecturas dudosas se vuelven a analizar. No se vuelve a detectar una captura que ya fue validada y leída al final de la ronda anterior.
 
 Validación con 22 capturas posteriores de una partida experta 30x16: cero diferencias frente a las matrices guardadas y 54,32 segundos de lectura en la reproducción, frente a unos 172,78 segundos registrados para esas lecturas en la ejecución anterior. Son mediciones de lectura de capturas guardadas, no de una nueva partida completa.
+
+### Plantillas adicionales para los números pequeños de experto
+
+Se incluyen ocho formas de los números 1–5, extraídas de la captura inicial y las primeras seis rondas de una partida clásica 30x16 y confirmadas visualmente. `assets/digits/expert-sources.json` registra su procedencia. Se mantienen la normalización y los umbrales de coincidencia (0,90) y margen entre dígitos (0,08); una forma dudosa conserva Tesseract como alternativa. Las referencias se cargan automáticamente desde `assets/digits`.
+
+Las rondas posteriores se reservan para validación: las nuevas referencias reconocen 20 de las 23 formas distintas que antes recurrían al OCR en esas rondas. Los recortes independientes de prueba incluyen una forma de 5 que sigue necesitando OCR, para verificar que la alternativa se conserva. Las capturas completas de la partida no se incluyen en el repositorio.
+
+Comparación antes/después con la misma caché y geometría validada en 15 capturas de tablero: llamadas a Tesseract 176 → 6; lectura 58,80 → 5,11 segundos (91 % menos); cero diferencias en las matrices y banderas. La medición excluye captura, clics, espera, detección de cuadrícula y cálculo del solver; no representa el tiempo total de una partida. 91 pruebas pasan.
