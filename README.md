@@ -57,5 +57,31 @@ Validado con la captura proporcionada de Banderas Fácil: 16 × 16 posiciones,
 personal no se incluye en el repositorio. No se garantiza aún la detección de
 otros temas, escalas, tableros parcialmente ocultos o ventanas con diálogos.
 
-Pendiente: probabilidades, reconocimiento del contenido de las casillas,
+## OCR de números
+
+Instala Tesseract OCR en el sistema (en Windows se busca también en
+`C:\Program Files\Tesseract-OCR\tesseract.exe`) y las dependencias de requirements.txt.
+
+```console
+python ocr.py captura.png --output ocr-preview.png
+```
+
+Recorta el interior de casillas detectadas. Un fondo predominantemente blanco
+permite analizar el dígito: separa trazos oscuros, amplía la forma cinco veces y
+añade margen. Tesseract intenta un carácter aislado (PSM 10), con alternativa PSM 13,
+limitado a 1–8. Ambos modos se comprueban y un desacuerdo entre lecturas aceptadas
+queda como dudoso. Se exige una confianza de al menos 40; ese valor no equivale a una
+probabilidad calibrada. Casillas blancas sin trazos se leen como 0. Las lecturas
+fallidas llevan `status: uncertain` y una exclamación roja en la imagen.
+
+El JSON contiene una matriz parcial: números reconocidos y `null` para las demás
+posiciones, junto con estados y confianza. No debe pasarse aún al solver.
+No clasifica tapadas, banderas, minas ni huecos. Validado visualmente sobre las
+dos capturas del tablero; la última contiene 42 dígitos reconocidos y cinco ceros.
+En la primera, un 2 confundido con 4 en uno de los modos obliga a señalar esa
+casilla como dudosa por desacuerdo.
+Todavía no hay validación con un 8 real ni con otros temas o escalas. El OCR por
+casilla tarda varios segundos por tablero; la optimización queda pendiente.
+
+Pendiente: probabilidades, clasificación del resto de las casillas,
 condiciones de cada desafío y control del ratón.
