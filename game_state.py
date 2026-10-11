@@ -32,8 +32,65 @@ def sunglasses_score(image):
     return score
 
 
-def has_sunglasses(image):
-    return sunglasses_score(image)>=.88
+class FaceTracker:
+    """Localiza la cara amarilla y conserva su región durante esta ejecución."""
+    def __init__(self):
+        self.shape=None
+        self.box=None
+
+    def locate(self,image):
+        h,w=image.shape[:2]
+        x0,y0=round(w*.72),round(h*.10)
+        roi=image[y0:round(h*.52),x0:round(w*.99)]
+        hue,saturation,value=cv2.split(cv2.cvtColor(roi,cv2.COLOR_BGR2HSV))
+        mask=((hue>=15)&(hue<=40)&(saturation>90)&(value>20)).astype(np.uint8)*255
+        # Las gafas separan la frente del resto de la cara: une esos fragmentos.
+        kernel=np.ones((max(7,round(h*.014)),3),np.uint8)
+        mask=cv2.morphologyEx(mask,cv2.MORPH_CLOSE,kernel)
+        contours,_=cv2.findContours(mask,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
+        candidates=[]
+        for contour in contours:
+            x,y,cw,ch=cv2.boundingRect(contour)
+            if h*.04<ch<h*.23 and .65<cw/ch<1.4 and cv2.contourArea(contour)>cw*ch*.4:
+                candidates.append((cv2.contourArea(contour),(x+x0,y+y0,cw,ch)))
+        self.shape=image.shape
+        self.box=max(candidates,key=lambda item:item[0])[1] if candidates else None
+
+    def score(self,image):
+        if self.shape!=image.shape or self.box is None:
+            self.locate(image)
+        if self.box is None:
+            # Sin cara visible, el OCR del diálogo sigue siendo la vía de fin.
+            return 0.0
+        x,y,w,h=self.box
+        pad=max(4,round(h*.12))
+        crop=image[max(0,y-pad):y+h+pad,max(0,x-pad):x+w+pad]
+        hue,saturation,_=cv2.split(cv2.cvtColor(crop,cv2.COLOR_BGR2HSV))
+        if np.mean((hue>=15)&(hue<=40)&(saturation>90))<.15:
+            self.box=None
+            self.locate(image)
+            return self.score(image) if self.box is not None else 0.0
+        gray=cv2.cvtColor(crop,cv2.COLOR_BGR2GRAY)
+        source=_face_source()
+        best=0.0
+        # Misma posición: solo pequeños ajustes del tamaño localizado.
+        for height in (h,h+2,h+4):
+            template=cv2.resize(source,(round(height*source.shape[1]/source.shape[0]),height))
+            if template.shape[0]<=gray.shape[0] and template.shape[1]<=gray.shape[1]:
+                best=max(best,float(cv2.minMaxLoc(cv2.matchTemplate(gray,template,cv2.TM_CCOEFF_NORMED))[1]))
+        return best
+
+
+@lru_cache(maxsize=1)
+def _face_source():
+    source=cv2.imread(str(Path(__file__).parent/'assets'/'win-face.png'),cv2.IMREAD_GRAYSCALE)
+    if source is None:
+        raise RuntimeError('No se encontró la plantilla de victoria.')
+    return source
+
+
+def has_sunglasses(image, tracker=None):
+    return (tracker.score(image) if tracker is not None else sunglasses_score(image))>=.88
 
 
 def outcome_from_text(text):
@@ -56,8 +113,8 @@ def possible_result_dialog(image):
     return bool(np.mean(light_neutral)>.55)
 
 
-def detect_outcome(image):
-    if has_sunglasses(image):
+def detect_outcome(image, tracker=None):
+    if has_sunglasses(image,tracker):
         return 'won'
     if not possible_result_dialog(image):
         return None
@@ -90,8 +147,8 @@ def similar(a,b):
     return float(np.mean(delta > 12)) < .002
 
 
-def wait_stable(capture, grid=None, timeout=12, interval=.3, stable_seconds=.9,
-                minimum_wait=1.2, clock=time.monotonic, sleep=time.sleep):
+def wait_stable(capture, grid=None, timeout=12, interval=.15, stable_seconds=.45,
+                minimum_wait=.6, clock=time.monotonic, sleep=time.sleep, tracker=None):
     start = clock()
     previous = None
     stable_since = None
@@ -99,7 +156,7 @@ def wait_stable(capture, grid=None, timeout=12, interval=.3, stable_seconds=.9,
         image = capture()
         # La celebración puede animarse durante más tiempo que el límite.
         # Las gafas permiten reconocer victoria sin esperar al confeti.
-        if has_sunglasses(image):
+        if has_sunglasses(image,tracker):
             return image
         region = stability_region(image,grid)
         now = clock()

@@ -14,7 +14,7 @@ from actions import plan_actions, target_is_covered
 from analyze import correct_uncertain, solve_reading, draw_deductions
 from ocr import configure_tesseract, read_board
 from vision import detect_grid
-from game_state import detect_outcome, wait_stable, stability_region, similar, has_sunglasses, possible_result_dialog
+from game_state import detect_outcome, wait_stable, stability_region, similar, has_sunglasses, possible_result_dialog, FaceTracker
 from profiling import Timings
 
 
@@ -29,15 +29,16 @@ def play(capture, click, check_window, output, execute=False, loop=False, max_ro
     """Motor con adaptadores para probar el flujo sin controlar el ordenador."""
     output.mkdir(parents=True, exist_ok=True)
     timings = Timings(output/'timings.json')
+    face_tracker=FaceTracker()
     original_capture = capture
     capture = lambda: timings.measure('capture',original_capture)
-    image = timings.measure('stability',lambda:wait_stable(capture))
+    image = timings.measure('stability',lambda:wait_stable(capture,tracker=face_tracker))
     reading = None
     for turn in range(1, (max_rounds if loop else 1)+1):
         folder = output / f'round-{turn:03d}'
         folder.mkdir(parents=True,exist_ok=True)
         cv2.imwrite(str(folder/'before.png'),image)
-        outcome = timings.measure('outcome',lambda:detect_outcome(image))
+        outcome = timings.measure('outcome',lambda:detect_outcome(image,face_tracker))
         if outcome:
             return finish(output,outcome,turn-1)
         grid = timings.measure('grid',lambda:detect_grid(image))
@@ -67,7 +68,7 @@ def play(capture, click, check_window, output, execute=False, loop=False, max_ro
                 # Una apertura anterior puede haber descubierto esta casilla.
                 # Un diálogo que oscurece/cubre el tablero tampoco se pulsa.
                 latest = capture()
-                if has_sunglasses(latest):
+                if timings.measure('face_check',lambda:has_sunglasses(latest,face_tracker)):
                     cv2.imwrite(str(folder/'after.png'),latest)
                     return finish(output,'won',turn)
                 if possible_result_dialog(latest):
@@ -77,9 +78,9 @@ def play(capture, click, check_window, output, execute=False, loop=False, max_ro
                     print(f'Omitida fila {action["row"]}, columna {action["col"]}: ya no está tapada o está oculta.')
                     continue
             click(action)
-        after = timings.measure('stability',lambda:wait_stable(capture,grid))
+        after = timings.measure('stability',lambda:wait_stable(capture,grid,tracker=face_tracker))
         cv2.imwrite(str(folder/'after.png'),after)
-        outcome = timings.measure('outcome',lambda:detect_outcome(after))
+        outcome = timings.measure('outcome',lambda:detect_outcome(after,face_tracker))
         if outcome:
             return finish(output,outcome,turn)
         after_grid = timings.measure('grid',lambda:detect_grid(after))

@@ -148,8 +148,8 @@ Repite lotes de banderas y aperturas seguras. Antes de cada apertura comprueba
 rápidamente el color de la casilla, sin OCR: omite las ya descubiertas por una
 apertura anterior y las ocultas u oscurecidas por un diálogo. Al terminar el lote
 relee los cambios una sola vez. Después de abrir, espera al menos
-1,2 segundos y exige aproximadamente 0,9 segundos de estabilidad en capturas
-separadas 0,3 segundos. Compara la zona del tablero, excluyendo reloj y anuncios;
+0,6 segundos y exige aproximadamente 0,45 segundos de estabilidad en capturas
+separadas 0,15 segundos. Compara la zona del tablero, excluyendo reloj y anuncios;
 antes de localizarlo usa la zona del título del diálogo. Si no se estabiliza en
 12 segundos, se detiene. No garantiza cubrir todas las animaciones posibles.
 
@@ -189,7 +189,10 @@ una partida completa con la versión optimizada.
 ## Victoria por gafas de sol
 
 Antes de llamar al OCR, busca la cara con gafas en la zona superior derecha
-mediante comparación de plantilla en varias escalas. La referencia recortada
+mediante comparación de plantilla. En el bucle localiza la cara amarilla una vez
+y conserva su posición y tamaño; compara solo esa región con tres pequeños
+ajustes de escala. Vuelve a localizarla si cambia el tamaño de la imagen o
+desaparece la cara de la región. La referencia recortada
 está en assets/win-face.png. Una coincidencia de al menos 0,88 detiene el juego
 como victoria, incluso durante el confeti, sin esperar estabilidad. También se
 comprueba antes de las aperturas del lote para evitar clics después de ganar.
@@ -220,3 +223,17 @@ Un diálogo durante un lote interrumpe las aperturas para comprobar el mensaje;
 si es ilegible o desconocido, se detiene. Las capturas de partida activa no
 lanzan OCR del resultado. El filtro está ajustado al tema y a los diálogos
 proporcionados y debe validarse si cambia la distribución o el tema.
+
+## Comprobaciones visuales más rápidas
+
+El seguimiento del emoji es local a la partida; no se reutiliza al iniciar otra
+ejecución. Si el diálogo oscurece demasiado la cara, el OCR del título sigue
+detectando victoria o derrota. timings.json incluye face_check para las
+comprobaciones entre aperturas (las hechas dentro de la espera siguen incluidas
+en stability). Medición en una captura activa: comparación localizada ~0,0014 s
+frente a ~0,33 s de la búsqueda amplia anterior, sin incluir captura de pantalla.
+
+La espera más corta sigue reiniciándose al cambiar el tablero y conserva un
+máximo de 12 segundos. Las pruebas simulan una animación continua y verifican
+que no se acepta hasta estabilizarse. No se han reducido las pausas del ratón.
+La mejora del tiempo de partida completo queda pendiente de medir en vivo.

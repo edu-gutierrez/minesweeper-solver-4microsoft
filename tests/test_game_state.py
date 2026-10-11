@@ -25,7 +25,7 @@ class StateTests(unittest.TestCase):
             return image
         result=wait_stable(capture,grid,clock=lambda:ticks[0],sleep=lambda t:ticks.__setitem__(0,ticks[0]+t))
         self.assertEqual(result.shape,frame.shape)
-        self.assertGreaterEqual(ticks[0],1.2)
+        self.assertGreaterEqual(ticks[0],.6)
 
     def test_never_stable_times_out(self):
         ticks=[0.0]
@@ -33,6 +33,18 @@ class StateTests(unittest.TestCase):
             return np.full((100,100,3),255 if int(ticks[0]*10)%2 else 0,dtype=np.uint8)
         with self.assertRaises(RuntimeError):
             wait_stable(capture,timeout=1,interval=.1,clock=lambda:ticks[0],sleep=lambda t:ticks.__setitem__(0,ticks[0]+t))
+
+    def test_animation_resets_shorter_stability_window(self):
+        ticks=[0.0]
+        grid={'cell_size':10,'x_centers':[30,40,50],'y_centers':[30,40,50]}
+        def capture():
+            image=np.zeros((100,100,3),dtype=np.uint8)
+            level=min(160,int(ticks[0]/.15)*30)
+            image[25:55,25:55]=level
+            return image
+        wait_stable(capture,grid,clock=lambda:ticks[0],sleep=lambda t:ticks.__setitem__(0,ticks[0]+t))
+        self.assertGreaterEqual(ticks[0],1.2)
+        self.assertLess(ticks[0],2)
 
 
 class LoopTests(unittest.TestCase):

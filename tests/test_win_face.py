@@ -5,10 +5,29 @@ from unittest.mock import patch
 import cv2
 import numpy as np
 
-from game_state import has_sunglasses, detect_outcome, wait_stable
+from game_state import has_sunglasses, detect_outcome, wait_stable, FaceTracker
 
 
 class WinFaceTests(unittest.TestCase):
+    def test_tracker_reuses_location_and_relocates_on_resize(self):
+        tracker=FaceTracker()
+        image=self.winning_frame()
+        with patch.object(tracker,'locate',wraps=tracker.locate) as locate:
+            self.assertTrue(has_sunglasses(image,tracker))
+            self.assertTrue(has_sunglasses(image.copy(),tracker))
+            self.assertEqual(locate.call_count,1)
+            small=cv2.resize(image,None,fx=.5,fy=.5)
+            self.assertTrue(has_sunglasses(small,tracker))
+            self.assertEqual(locate.call_count,2)
+
+    def test_tracker_recovers_when_face_moves_inside_same_window(self):
+        tracker=FaceTracker()
+        image=self.winning_frame()
+        self.assertTrue(has_sunglasses(image,tracker))
+        moved=np.full_like(image,30)
+        moved[280:376,990:1095]=image[160:256,990:1095]
+        self.assertTrue(has_sunglasses(moved,tracker))
+
     def winning_frame(self):
         image=np.full((800,1200,3),30,dtype=np.uint8)
         face=cv2.imread(str(Path(__file__).resolve().parents[1]/'assets'/'win-face.png'))
