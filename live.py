@@ -16,6 +16,7 @@ from ocr import configure_tesseract, read_board
 from vision import detect_grid
 from game_state import detect_outcome, wait_stable, stability_region, similar, has_sunglasses, possible_result_dialog, FaceTracker
 from profiling import Timings
+from mine_counter import read_remaining_mines
 
 
 def window_rect(user32, hwnd):
@@ -25,7 +26,8 @@ def window_rect(user32, hwnd):
     return rect.left, rect.top, rect.right, rect.bottom
 
 
-def play(capture, click, check_window, output, execute=False, loop=False, max_rounds=200):
+def play(capture, click, check_window, output, execute=False, loop=False, max_rounds=200,
+         counter_reader=None):
     """Motor con adaptadores para probar el flujo sin controlar el ordenador."""
     output.mkdir(parents=True, exist_ok=True)
     timings = Timings(output/'timings.json')
@@ -34,6 +36,7 @@ def play(capture, click, check_window, output, execute=False, loop=False, max_ro
     capture = lambda: timings.measure('capture',original_capture)
     image = timings.measure('stability',lambda:wait_stable(capture,tracker=face_tracker))
     reading = None
+    total_mines = None
     for turn in range(1, (max_rounds if loop else 1)+1):
         folder = output / f'round-{turn:03d}'
         folder.mkdir(parents=True,exist_ok=True)
@@ -48,7 +51,23 @@ def play(capture, click, check_window, output, execute=False, loop=False, max_ro
         if reading.get('manual_corrections'):
             print('Corrección recibida. Devuelve el foco a Minesweeper en 5 segundos.')
             time.sleep(5)
-        solved = timings.measure('deduction',lambda:solve_reading(reading))
+        if total_mines is None and counter_reader is not None:
+            try:
+                remaining = counter_reader(image)
+            except ValueError as error:
+                print(f'{error} Introduce el valor que muestra el contador.')
+                remaining = int(input('Minas restantes: '))
+                print('Devuelve el foco a Minesweeper en 5 segundos.')
+                time.sleep(5)
+            if type(remaining) is not int or remaining < 0:
+                raise ValueError('El contador debe ser un entero no negativo.')
+            initial_flags = sum(sum(row) for row in reading['flags_visible'])
+            total_mines = remaining + initial_flags
+            (output/'mines.json').write_text(json.dumps({
+                'initial_counter':remaining, 'initial_flags':initial_flags,
+                'total_mines':total_mines},indent=2),encoding='utf-8')
+            print(f'Total de minas: {total_mines}. Contador leído solo al inicio.')
+        solved = timings.measure('deduction',lambda:solve_reading(reading,total_mines=total_mines))
         plan = plan_actions(reading['board'],solved,reading['flags_visible'],grid)
         (folder/'plan.json').write_text(json.dumps({'reading':reading,'grid':grid,'actions':plan},indent=2),encoding='utf-8')
         cv2.imwrite(str(folder/'plan.png'),draw_deductions(image,grid,reading['board'],solved))
@@ -146,7 +165,8 @@ def run(output, execute=False, loop=False, max_rounds=200):
         time.sleep(.2)
     configure_tesseract()
     try:
-        return play(capture,click,check_window,output,execute,loop,max_rounds)
+        return play(capture,click,check_window,output,execute,loop,max_rounds,
+                    counter_reader=read_remaining_mines)
     except (RuntimeError,ValueError,EOFError,pyautogui.FailSafeException) as error:
         output.mkdir(parents=True,exist_ok=True)
         (output/'result.json').write_text(json.dumps({'reason':'error','message':str(error)},indent=2),encoding='utf-8')

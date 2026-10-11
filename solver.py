@@ -26,7 +26,7 @@ def validate(board: Board) -> None:
                 raise ValueError(f"Estado de casilla inválido: {cell!r}")
 
 
-def deduce(board: Board) -> Board:
+def deduce(board: Board, total_mines: int | None = None) -> Board:
     """Devuelve una copia con minas 'f' y casillas seguras 'o' deducidas.
 
     Combina reglas básicas y subconjuntos hasta que no hay información nueva.
@@ -34,6 +34,8 @@ def deduce(board: Board) -> Board:
     Una lectura incompatible provoca un error, nunca una jugada automática.
     """
     validate(board)
+    if total_mines is not None and (type(total_mines) is not int or total_mines < 0):
+        raise ValueError("El total de minas debe ser un entero no negativo.")
     result = [row.copy() for row in board]
     height, width = len(result), len(result[0])
 
@@ -48,6 +50,8 @@ def deduce(board: Board) -> Board:
                 raise ValueError("Restricción de minas incompatible.")
             if cells in constraints and constraints[cells] != mines:
                 raise ValueError("El mismo grupo tiene cantidades de minas contradictorias.")
+            # La restricción global genera muchos complementos. Limitamos los
+            # grupos derivados, conservando siempre las pistas originales.
             if cells:
                 constraints[cells] = mines
 
@@ -69,6 +73,13 @@ def deduce(board: Board) -> Board:
                     raise ValueError(f"Pistas incompatibles en ({r}, {c}).")
                 add_constraint(unknown, remaining)
 
+        if total_mines is not None:
+            confirmed = sum(cell in ('m', 'f') for row in result for cell in row)
+            covered = [(r, c) for r, row in enumerate(result)
+                       for c, cell in enumerate(row) if cell == '?']
+            add_constraint(covered, total_mines - confirmed)
+        group_limit = max(512, len(constraints)) if total_mines is not None else None
+
         # Si A está contenido en B, B - A contiene minas(B) - minas(A).
         # Los grupos derivados también pueden participar en nuevas restas.
         while True:
@@ -77,7 +88,12 @@ def deduce(board: Board) -> Board:
             for smaller, small_mines in groups:
                 for larger, large_mines in groups:
                     if smaller < larger:
-                        add_constraint(larger - smaller, large_mines - small_mines)
+                        difference = larger - smaller
+                        mines = large_mines - small_mines
+                        if group_limit is None or len(constraints) < group_limit or difference in constraints:
+                            add_constraint(difference, mines)
+                        elif not 0 <= mines <= len(difference):
+                            raise ValueError("Restricción de minas incompatible.")
             if len(constraints) == previous_count:
                 break
 

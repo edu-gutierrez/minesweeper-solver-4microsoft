@@ -41,10 +41,10 @@ def correct_uncertain(image, grid, result, folder, input_fn=input):
     result['manual_corrections'] = corrections
 
 
-def solve_reading(result):
+def solve_reading(result, total_mines=None):
     if any(cell is None for row in result['board'] for cell in row):
         raise ValueError('Hay casillas sin resolver; se requiere corrección manual.')
-    return deduce(result['board'])
+    return deduce(result['board'], total_mines=total_mines)
 
 
 def draw_deductions(image, grid, board, solved):

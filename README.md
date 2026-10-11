@@ -237,3 +237,9 @@ La espera más corta sigue reiniciándose al cambiar el tablero y conserva un
 máximo de 12 segundos. Las pruebas simulan una animación continua y verifican
 que no se acepta hasta estabilizarse. No se han reducido las pausas del ratón.
 La mejora del tiempo de partida completo queda pendiente de medir en vivo.
+
+### Total de minas en clásico
+
+Al iniciar `live.py`, se lee una sola vez el contador y se suman las banderas visibles para recuperar el total de minas. Se guarda en `mines.json`. En cada deducción se resta el número de minas confirmadas (`f` y `m`); no se vuelve a consultar el contador de pantalla. Si el OCR inicial es dudoso, el programa pide introducir su valor por terminal. Las banderas iniciales deben ser correctas.
+
+El total se usa como restricción global junto con las pistas locales y las restas de subconjuntos. Permite abrir los complementos sin minas o marcar los complementos llenos de minas. Para limitar el coste, la combinación con el total genera como máximo 512 grupos (o el número de pistas originales si es mayor); esto puede dejar deducciones sin encontrar, pero no justifica apuestas. No calcula probabilidades ni hace clics aleatorios. La región del contador corresponde al tema clásico de las capturas proporcionadas; otras distribuciones de la interfaz no están validadas.
