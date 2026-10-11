@@ -12,6 +12,7 @@ import pytesseract
 
 from vision import detect_grid
 from digit_templates import match_digit
+from mine_templates import match_mine
 
 
 def configure_tesseract():
@@ -97,6 +98,9 @@ def read_cell(crop, detected=True):
         # La cuadrícula ya reconstruyó esta posición: reconocer la bandera no
         # requiere que Canny haya encontrado el borde de la casilla.
         return {"value": "f", "status": "flag", "confidence": None, "flag_visible": True}
+    mine = match_mine(crop)
+    if mine:
+        return mine
     if not detected:
         dark = brightness < 100
         if np.mean(dark) > 0.95:

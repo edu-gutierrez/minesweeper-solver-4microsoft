@@ -162,7 +162,10 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
         failures = []
         for action in plan:
             r,c = action['row']-1,action['col']-1
-            valid = updated['flags_visible'][r][c] if action['button']=='right' else type(updated['board'][r][c]) is int
+            value = updated['board'][r][c]
+            valid = updated['flags_visible'][r][c] if action['button']=='right' else (type(value) is int or value=='m')
+            if action['button']=='left' and value=='m':
+                print(f'Mina revelada: fila {r+1}, columna {c+1}; la partida sigue activa.')
             if not valid:
                 failures.append(action)
         (folder/'verification.json').write_text(json.dumps({'reading':updated,'failed_actions':failures},indent=2),encoding='utf-8')
