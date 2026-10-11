@@ -31,3 +31,22 @@ class GridTests(unittest.TestCase):
     def test_blank_image_is_rejected(self):
         with self.assertRaises(ValueError):
             detect_grid(np.zeros((200, 200, 3), dtype=np.uint8))
+
+    def test_fractional_spacing_does_not_accumulate_center_error(self):
+        for step in (28.5,43.5,36.25):
+            with self.subTest(step=step):
+                size=int(step)-3
+                image=np.zeros((800,1400,3),dtype=np.uint8)
+                for r in range(14):
+                    for c in range(24):
+                        if 5<=r<9 and 10<=c<14:
+                            continue
+                        x,y=int(90+c*step),int(55+r*step)
+                        cv2.rectangle(image,(x,y),(x+size-1,y+size-1),(230,160,50),-1)
+                grid=detect_grid(image)
+                self.assertEqual((grid['rows'],grid['cols']),(14,24))
+                self.assertEqual(grid['detected_count'],320)
+                for c,x in enumerate(grid['x_centers']):
+                    self.assertAlmostEqual(x,90+c*step+(size-1)/2,delta=1)
+                for r,y in enumerate(grid['y_centers']):
+                    self.assertAlmostEqual(y,55+r*step+(size-1)/2,delta=1)

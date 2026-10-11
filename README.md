@@ -256,6 +256,8 @@ El cálculo exacto tiene un límite de 2 segundos, 250.000 nodos de búsqueda y 
 
 ### Cuadrícula estable durante una partida
 
+La separación entre centros se ajusta usando todas las posiciones detectadas. Esto conserva separaciones fraccionarias: una cuadrícula de paso 43,5 píxeles alterna distancias de 43 y 44 en la imagen. Usar solo la mediana como paso acumulaba desplazamiento y recortaba bordes oscuros junto a los números. La captura del desafío diario clásico 24x14, con un hueco central de 4x4, se lee sin casillas dudosas en 1,75 segundos tras este ajuste. La prueba de regresión cubre tres separaciones fraccionarias; 98 pruebas pasan. Esta validación cubre el tablero, no el contador azul ni las vidas del desafío diario.
+
 El jugador conserva los centros y el tamaño de recorte calibrados al inicio. Después de cada lote, detecta los nuevos contornos y valida que las dimensiones coincidan, que la estimación no se aleje más de 3 píxeles y que al menos tres teselas completas (incluidos sus bordes) permanezcan idénticas en las coordenadas originales. Si falta evidencia de alineación o cambia el tamaño de la captura, se detiene para recalibrar iniciando de nuevo. Esta validación puede detenerse de forma conservadora si cambian todas las teselas.
 
 Una vez validada la geometría, cada casilla se reutiliza solo si sus píxeles interiores son idénticos y su lectura anterior era automática y válida. Los cambios de la máscara de contornos no invalidan esas lecturas. Las correcciones manuales y lecturas dudosas se vuelven a analizar. No se vuelve a detectar una captura que ya fue validada y leída al final de la ronda anterior.

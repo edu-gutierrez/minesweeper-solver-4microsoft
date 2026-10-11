@@ -80,6 +80,12 @@ def detect_grid(image):
             raise ValueError("No se ha encontrado una separación regular.")
         step = float(np.median(regular))
         indices = np.rint((np.array(observed) - observed[0]) / step).astype(int)
+        # Una separación real de 43,5 px alterna distancias observadas de 43
+        # y 44. Su mediana puede ser 44 y acumular error a lo largo del tablero.
+        # Ajustamos la separación con todos los centros y sus índices.
+        centered_indices = indices-indices.mean()
+        step = float(np.dot(centered_indices,np.array(observed)-np.mean(observed))
+                     / np.dot(centered_indices,centered_indices))
         origin = float(np.median(np.array(observed) - indices * step))
         if np.max(np.abs(np.array(observed) - (origin + indices * step))) > dominant * 0.2:
             raise ValueError("Los contornos no forman una cuadrícula regular.")
