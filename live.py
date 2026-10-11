@@ -10,7 +10,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from actions import plan_actions
+from actions import plan_actions, target_is_covered
 from analyze import correct_uncertain, solve_reading, draw_deductions
 from ocr import configure_tesseract, read_board
 from vision import detect_grid
@@ -63,6 +63,13 @@ def play(capture, click, check_window, output, execute=False, loop=False, max_ro
             raise RuntimeError('El tablero cambió durante el análisis; ejecución detenida.')
         for action in plan:
             check_window()
+            if action['button'] == 'left':
+                # Una apertura anterior puede haber descubierto esta casilla.
+                # Un diálogo que oscurece/cubre el tablero tampoco se pulsa.
+                latest = capture()
+                if not target_is_covered(latest,action,grid):
+                    print(f'Omitida fila {action["row"]}, columna {action["col"]}: ya no está tapada o está oculta.')
+                    continue
             click(action)
         after = timings.measure('stability',lambda:wait_stable(capture,grid))
         cv2.imwrite(str(folder/'after.png'),after)

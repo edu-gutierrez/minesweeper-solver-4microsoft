@@ -125,7 +125,7 @@ python live.py --execute --output live-test
 ```
 
 La primera orden solo genera un plan. La segunda coloca las banderas pendientes
-y abre como máximo una casilla segura, y termina. Abre una partida clásica
+y abre todas las casillas seguras deducidas en un lote, y termina. Abre una partida clásica
 iniciada y pon Microsoft Minesweeper en primer plano durante la cuenta atrás de
 cinco segundos. No muevas la ventana ni juegues durante el análisis. Se usa la
 posición actual de la ventana y los centros detectados, no las coordenadas de
@@ -144,7 +144,10 @@ Las banderas previas deben ser correctas; las marcas verdes se consideran tapada
 python live.py --execute --loop --output live-game
 ```
 
-Repite lotes de banderas y una apertura segura. Después de abrir, espera al menos
+Repite lotes de banderas y aperturas seguras. Antes de cada apertura comprueba
+rápidamente el color de la casilla, sin OCR: omite las ya descubiertas por una
+apertura anterior y las ocultas u oscurecidas por un diálogo. Al terminar el lote
+relee los cambios una sola vez. Después de abrir, espera al menos
 1,2 segundos y exige aproximadamente 0,9 segundos de estabilidad en capturas
 separadas 0,3 segundos. Compara la zona del tablero, excluyendo reloj y anuncios;
 antes de localizarlo usa la zona del título del diálogo. Si no se estabiliza en

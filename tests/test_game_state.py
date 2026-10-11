@@ -36,6 +36,22 @@ class StateTests(unittest.TestCase):
 
 
 class LoopTests(unittest.TestCase):
+    def test_batch_skips_auto_revealed_cell_and_reads_once_after_batch(self):
+        frame=np.zeros((60,60,3),dtype=np.uint8)
+        grid={'rows':2,'cols':2,'cell_size':10,'x_centers':[20,40],'y_centers':[20,40]}
+        first={'board':[[0,'?'],['?','?']],'flags_visible':[[False]*2 for _ in range(2)],'details':[[{},{}],[{},{}]]}
+        after={'board':[[0,0],[0,0]],'flags_visible':[[False]*2 for _ in range(2)],'details':[[{},{}],[{},{}]]}
+        with tempfile.TemporaryDirectory() as folder, \
+             patch('live.wait_stable',return_value=frame), \
+             patch('live.detect_outcome',return_value=None), \
+             patch('live.detect_grid',return_value=grid), \
+             patch('live.read_board',side_effect=[first,after]) as read, \
+             patch('live.target_is_covered',side_effect=[True,False,True]):
+            actions=[]
+            play(lambda:frame,actions.append,lambda:None,Path(folder),execute=True)
+            self.assertEqual([(a['row'],a['col']) for a in actions],[(1,2),(2,2)])
+            self.assertEqual(read.call_count,2)
+
     def test_loop_reuses_updated_board_and_stops_on_loss(self):
         frame=np.zeros((60,60,3),dtype=np.uint8)
         grid={'rows':1,'cols':3,'cell_size':10,'x_centers':[10,30,50],'y_centers':[20]}
@@ -45,7 +61,8 @@ class LoopTests(unittest.TestCase):
              patch('live.wait_stable',return_value=frame), \
              patch('live.detect_outcome',side_effect=[None,None,None,'lost']), \
              patch('live.detect_grid',return_value=grid), \
-             patch('live.read_board',side_effect=[first,second]) as read:
+             patch('live.read_board',side_effect=[first,second]) as read, \
+             patch('live.target_is_covered',return_value=True):
             actions=[]
             result=play(lambda:frame,actions.append,lambda:None,Path(folder),execute=True,loop=True)
             self.assertEqual(result['reason'],'lost')
@@ -72,7 +89,8 @@ class LoopTests(unittest.TestCase):
              patch('live.wait_stable',return_value=frame), \
              patch('live.detect_outcome',side_effect=[None,'won']), \
              patch('live.detect_grid',return_value=grid), \
-             patch('live.read_board',return_value=reading) as read:
+             patch('live.read_board',return_value=reading) as read, \
+             patch('live.target_is_covered',return_value=True):
             actions=[]
             result=play(lambda:frame,actions.append,lambda:None,Path(folder),execute=True,loop=True)
             self.assertEqual(result['reason'],'won')
