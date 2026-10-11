@@ -135,5 +135,30 @@ PyAutoGUI. Si no hay deducciones seguras, no se abre ninguna casilla.
 El programa comprueba el foco, la posición y que el tablero no cambió durante
 el OCR. Coloca las banderas en bloque sin releer entre ellas. Después de las
 acciones guarda after.png, relee y verifica las banderas y la apertura. Si una
-acción no se verifica, termina sin repetirla. Aún no hay bucle de partida completa.
+acción no se verifica, termina sin repetirla.
 Las banderas previas deben ser correctas; las marcas verdes se consideran tapadas.
+
+## Bucle clásico y animaciones
+
+```console
+python live.py --execute --loop --output live-game
+```
+
+Repite lotes de banderas y una apertura segura. Después de abrir, espera al menos
+1,2 segundos y exige aproximadamente 0,9 segundos de estabilidad en capturas
+separadas 0,3 segundos. Compara la zona del tablero, excluyendo reloj y anuncios;
+antes de localizarlo usa la zona del título del diálogo. Si no se estabiliza en
+12 segundos, se detiene. No garantiza cubrir todas las animaciones posibles.
+
+Busca con OCR «Enhorabuena» (victoria) y «Has dado en una mina» (derrota) antes
+de leer el tablero y después de cada ronda. No pulsa los botones de resultados
+ni continúa tras perder. También para si no hay jugadas seguras, cambia el foco
+o la ventana, hay un error o se alcanzan 200 rondas (ajustable con --max-rounds).
+Las lecturas dudosas siguen solicitando corrección manual. Si usas la terminal
+para corregir, devuelve el foco al juego antes de continuar.
+
+Cada ronda guarda sus capturas, plan y verificación en round-001, round-002, etc.
+result.json indica el motivo final. Sin --loop sigue ejecutando una sola ronda.
+Detector final comprobado con las capturas de victoria, derrota y partida activa,
+tanto a tamaño original como a mitad de escala. El bucle se ha verificado con
+pruebas simuladas; todavía falta una partida completa en vivo.
