@@ -74,21 +74,45 @@ queda como dudoso. Se exige una confianza de al menos 40; ese valor no equivale 
 probabilidad calibrada. Casillas blancas sin trazos se leen como 0. Las lecturas
 fallidas llevan `status: uncertain` y una exclamación roja en la imagen.
 
-El JSON contiene una matriz parcial: números reconocidos, `f` para banderas
-confirmadas del desafío y `null` para las demás
-posiciones, junto con estados y confianza. No debe pasarse aún al solver.
+El JSON contiene números reconocidos, `f` para banderas confirmadas del desafío,
+`?` para casillas tapadas y `b` para huecos. Las lecturas dudosas quedan como `null`
+con estados y confianza; solo una matriz sin valores pendientes puede ir al solver.
 La matriz `flags_visible` registra por separado qué minas ya están marcadas.
 El detector de banderas exige fondo amarillo y símbolo rojo; no basta con el fondo.
 Este lector asume las banderas confirmadas del propio desafío, como se acordó;
 no debe usarse esa confianza para banderas arbitrarias de una partida manual.
 Comprobado con cuatro banderas en la primera captura y dos en la segunda, sin
 confundir la marca verde de interrogación. No controla todavía el ratón.
-No clasifica tapadas, minas visibles ni huecos. Validado visualmente sobre las
+No reconoce todavía minas visibles. Validado visualmente sobre las
 dos capturas del tablero; la última contiene 42 dígitos reconocidos y cinco ceros.
 En la primera, un 2 confundido con 4 en uno de los modos obliga a señalar esa
 casilla como dudosa por desacuerdo.
 Todavía no hay validación con un 8 real ni con otros temas o escalas. El OCR por
 casilla tarda varios segundos por tablero; la optimización queda pendiente.
 
-Pendiente: probabilidades, clasificación del resto de las casillas,
+## Flujo completo sobre una captura
+
+```console
+python analyze.py captura.png --output analysis.png
+```
+
+El lector clasifica el azul como casilla tapada. La marca verde de interrogación
+también conserva contenido desconocido, sin estado propio. Un hueco exige ausencia
+de contorno y un interior predominantemente oscuro; esta heurística está ajustada
+al tema de las capturas proporcionadas. Las lecturas dudosas se reintentan con otro
+umbral de segmentación. Si siguen sin resolverse, se guarda un recorte ampliado y
+se pide el valor en la terminal (fila y columna empiezan en 1). Abre el recorte
+indicado para revisarlo. Se aceptan 0–8, ?, f (bandera confirmada visible), m y b;
+q cancela el análisis.
+
+Las correcciones se guardan solo con el análisis de esa captura, incluyendo su
+huella SHA-256; no se reutilizan automáticamente en otras partidas. Con
+`--no-interactive` se guardan los pendientes y se termina sin deducir si hay alguno.
+El solver también rechaza pistas incompatibles. La imagen final muestra nuevas
+minas en rojo y casillas seguras en verde. No se hacen clics.
+
+Última captura: 16 huecos, 191 tapadas, 42 dígitos, cinco ceros y dos banderas;
+el solver deduce 15 minas adicionales y cuatro casillas seguras.
+
+Pendiente: probabilidades, reconocimiento de minas visibles,
 condiciones de cada desafío y control del ratón.

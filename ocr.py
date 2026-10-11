@@ -23,13 +23,13 @@ def configure_tesseract():
     pytesseract.pytesseract.tesseract_cmd = executable
 
 
-def prepare_digit(crop):
+def prepare_digit(crop, threshold=165):
     gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
     # El interior claro confirma que es una casilla descubierta en este tema.
     white = np.min(crop, axis=2) > 185
     if float(np.mean(white)) < 0.65:
         return None, False
-    mask = (gray < 165).astype(np.uint8) * 255
+    mask = (gray < threshold).astype(np.uint8) * 255
     count, labels, stats, _ = cv2.connectedComponentsWithStats(mask)
     parts = []
     for label in range(1, count):
@@ -45,8 +45,8 @@ def prepare_digit(crop):
     return cv2.copyMakeBorder(glyph, 25, 25, 25, 25, cv2.BORDER_CONSTANT, value=255), True
 
 
-def read_digit(crop):
-    glyph, is_open = prepare_digit(crop)
+def read_digit(crop, threshold=165):
+    glyph, is_open = prepare_digit(crop, threshold)
     if not is_open:
         return {"value": None, "status": "unclassified", "confidence": None}
     if glyph is None:
@@ -81,11 +81,31 @@ def is_flag(crop):
     return bool(np.mean(yellow) >= 0.45 and np.mean(red) >= 0.03)
 
 
-def read_cell(crop):
+def read_cell(crop, detected=True):
+    hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
+    hue, saturation, brightness = cv2.split(hsv)
+    if not detected:
+        dark = brightness < 100
+        if np.mean(dark) > 0.95:
+            return {"value": "b", "status": "hole", "confidence": None, "flag_visible": False}
+        return {"value": None, "status": "uncertain", "confidence": None, "flag_visible": False}
     if is_flag(crop):
         # El usuario confirmó que las banderas iniciales del desafío son fiables.
         return {"value": "f", "status": "flag", "confidence": None, "flag_visible": True}
-    return {**read_digit(crop), "flag_visible": False}
+    blue = (hue >= 90) & (hue <= 115) & (saturation > 70) & (brightness > 140)
+    marked = (hue >= 30) & (hue <= 50) & (saturation > 100) & (brightness > 140)
+    if np.mean(blue) > 0.65 or np.mean(marked) > 0.65:
+        return {"value": "?", "status": "covered", "confidence": None, "flag_visible": False}
+    result = read_digit(crop)
+    if result['value'] is None:
+        retry = read_digit(crop, threshold=195)
+        # Un reintento no puede convertir trazos dudosos en un falso cero.
+        if retry['status'] == 'read':
+            result = {**retry, "status": "retried"}
+        else:
+            result = {**result, "status": "uncertain"}
+        result['attempts'] = 2
+    return {**result, "flag_visible": False}
 
 
 def read_board(image, grid):
@@ -95,8 +115,7 @@ def read_board(image, grid):
         row, statuses = [], []
         for c, x in enumerate(grid["x_centers"]):
             crop = image[round(y)-half:round(y)+half+1, round(x)-half:round(x)+half+1]
-            result = read_cell(crop) if grid["detected"][r][c] else {
-                "value": None, "status": "unclassified", "confidence": None, "flag_visible": False}
+            result = read_cell(crop, detected=grid["detected"][r][c])
             row.append(result["value"])
             statuses.append(result)
         board.append(row)
