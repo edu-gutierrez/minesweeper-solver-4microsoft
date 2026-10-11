@@ -20,6 +20,7 @@ from game_state import detect_outcome, wait_stable, stability_region, similar, h
 from profiling import Timings
 from mine_counter import read_remaining_mines
 from probability import mine_probabilities, ProbabilityLimit
+from certainty import find_certainties
 
 
 def window_rect(user32, hwnd):
@@ -81,6 +82,15 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
             print(f'Total de minas: {total_mines}. Contador leído solo al inicio.')
         solved = timings.measure('deduction',lambda:solve_reading(reading,total_mines=total_mines))
         plan = plan_actions(reading['board'],solved,reading['flags_visible'],grid)
+        if not plan:
+            certainties = timings.measure('certainty',lambda:find_certainties(solved,total_mines))
+            for (r,c),mine in certainties.items():
+                solved[r][c] = 'f' if mine else 'o'
+            plan = plan_actions(reading['board'],solved,reading['flags_visible'],grid)
+            (folder/'certainties.json').write_text(json.dumps([
+                {'row':r+1,'col':c+1,'mine':bool(mine)}
+                for (r,c),mine in sorted(certainties.items())
+            ],indent=2),encoding='utf-8')
         if not plan and guess:
             if total_mines is None:
                 raise ValueError('Para apostar se requiere el total inicial de minas.')

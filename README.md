@@ -274,6 +274,10 @@ Comparación antes/después con la misma caché y geometría validada en 15 capt
 
 ### Solver, pausa de clic y tiempo total
 
+Cuando las reglas habituales no producen acciones, el motor busca certezas por contradicción antes de calcular probabilidades, también sin `--guess`. Modela las casillas tapadas como variables binarias y exige todas las pistas y el total inicial de minas, cuando está disponible. SciPy/HiGHS busca una distribución compatible y comprueba la hipótesis contraria de cada candidata. Solo declara una certeza cuando esa hipótesis resulta imposible; las soluciones alternativas descartan varias candidatas a la vez. Un límite de seis segundos conserva únicamente las certezas ya demostradas, sin considerar seguras las casillas pendientes. Las certezas se guardan en `certainties.json`; la medición aparece como `certainty`.
+
+La matriz del desafío diario que antes agotaba incluso 40 segundos de enumeración produce cuatro aperturas y tres banderas en unos tres segundos con este método. Se contrasta con probabilidades exactas en 30 tableros pequeños, además del caso diario, ambigüedad 50/50, límites y flujo del jugador. Instala la nueva dependencia con `python -m pip install -r requirements.txt`.
+
 La deducción representa cada grupo también como una máscara de bits para comprobar subconjuntos. Cada cierre de restricciones compara solo parejas que incluyen algún grupo nuevo y reutiliza los grupos derivados existentes, sin reconstruir complementos grandes repetidamente. Se conserva el orden de inserción y el límite de grupos. En las 24 matrices guardadas de una partida experta, el solver anterior y el nuevo producen exactamente las mismas deducciones; la comparación medida reduce 24,44 a 4,94 segundos.
 
 La pausa por clic pasa de aproximadamente 0,3 segundos (0,1 implícitos de PyAutoGUI más 0,2 explícitos) a 0,1 explícitos. Se desactiva solo la pausa implícita de esa llamada (`_pause=False`); las comprobaciones fail-safe de PyAutoGUI siguen activas. La comprobación de foco, las capturas entre aperturas, la espera estable después del lote y la verificación de acciones se mantienen. Para recuperar el ritmo anterior:
