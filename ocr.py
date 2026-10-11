@@ -11,6 +11,7 @@ import numpy as np
 import pytesseract
 
 from vision import detect_grid
+from digit_templates import match_digit
 
 
 def configure_tesseract():
@@ -52,6 +53,9 @@ def read_digit(crop, threshold=195):
         return {"value": None, "status": "unclassified", "confidence": None}
     if glyph is None:
         return {"value": 0, "status": "blank", "confidence": None}
+    matched=match_digit(glyph)
+    if matched is not None:
+        return matched
     readings = []
     accepted = []
     for mode in (10, 13):

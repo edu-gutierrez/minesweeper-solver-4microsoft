@@ -198,3 +198,16 @@ Si no aparece, se conserva el OCR del diálogo, incluida la derrota instantánea
 Comprobado con celebración y diálogo de victoria, derrota y dos partidas activas,
 a tamaño original y mitad de escala: victorias superiores a 0,98, otras caras
 inferiores a 0,50. Todavía debe validarse en otros temas y distribuciones de ventana.
+
+## Plantillas de números
+
+Antes de usar Tesseract, se normaliza la forma del dígito y se compara con los
+recortes verificados de assets/digits. Se acepta solo con similitud de al menos
+0,90 y un margen de 0,08 frente al segundo número candidato. Si es dudoso o no
+hay plantilla, conserva el OCR y la corrección manual. Hay referencias del 1 al 7;
+el 8 usa OCR hasta disponer de una muestra real. Las plantillas no aprenden solas
+de respuestas del OCR. Las lecturas incluyen status: template y template_score.
+
+Validación: 22 capturas guardadas coinciden con las matrices anteriores. En la
+ronda 20 de referencia, lectura completa 0,39 s e incremental 0,01 s (solo lectura,
+no tiempo total entre acciones). Pendiente validar otros temas/fuentes en vivo.
