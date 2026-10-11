@@ -3,6 +3,8 @@
 import cv2
 import numpy as np
 import pytesseract
+import json
+import time
 
 
 def read_flag_target(image):
@@ -15,8 +17,7 @@ def read_open_target(image):
 
 def read_action_target(image,mode):
     h,w=image.shape[:2]
-    top,bottom=(.46,.52) if mode=='flags' else (.52,.59)
-    crop=image[round(h*top):round(h*bottom),round(w*.88):round(w*.935)]
+    crop=target_crop(image,mode)
     hue,saturation,brightness=cv2.split(cv2.cvtColor(crop,cv2.COLOR_BGR2HSV))
     color=(hue>=30)&(hue<=50) if mode=='flags' else ((hue<=12)|(hue>=170))
     mask=(color&(saturation>100)&(brightness>100)).astype(np.uint8)*255
@@ -38,6 +39,33 @@ def read_action_target(image,mode):
     if len(tokens)!=1 or not tokens[0][0].isdigit() or tokens[0][1]<40:
         raise ValueError('Lectura dudosa del objetivo de acciones.')
     return int(tokens[0][0])
+
+
+def target_crop(image,mode):
+    h,w=image.shape[:2]
+    top,bottom=(.46,.52) if mode=='flags' else (.52,.59)
+    return image[round(h*top):round(h*bottom),round(w*.88):round(w*.935)]
+
+
+def retry_target(image,mode,reader,capture,folder,sleep=time.sleep):
+    """Tres intentos totales; captura nueva un segundo después de cada fallo."""
+    folder.mkdir(parents=True,exist_ok=True)
+    for attempt in range(1,4):
+        try:
+            value=reader(image)
+            if type(value) is not int or value<0:
+                raise ValueError('El objetivo debe ser un entero no negativo.')
+            return value,image
+        except ValueError as error:
+            crop=target_crop(image,mode)
+            cv2.imwrite(str(folder/f'attempt-{attempt:02d}.png'),crop)
+            (folder/f'attempt-{attempt:02d}.json').write_text(
+                json.dumps({'mode':mode,'error':str(error)},indent=2),encoding='utf-8')
+            if attempt==3:
+                raise
+            print(f'Objetivo dudoso (intento {attempt}/3); nueva captura en 1 segundo.')
+            sleep(1)
+            image=capture()
 
 
 def apply_knowledge(board,knowledge):

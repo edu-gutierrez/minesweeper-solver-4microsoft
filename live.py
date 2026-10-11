@@ -22,7 +22,7 @@ from mine_counter import read_remaining_mines
 from probability import mine_probabilities, ProbabilityLimit
 from certainty import find_certainties
 from treasure import read_mode, read_lives, choose_guess
-from flags_mode import read_flag_target, read_open_target, apply_knowledge, flag_plan, open_plan, successful_opens
+from flags_mode import read_flag_target, read_open_target, apply_knowledge, flag_plan, open_plan, successful_opens, retry_target
 from solver import deduce
 
 
@@ -62,6 +62,20 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
     open_target = None
     opens_done = 0
     knowledge = {}
+
+    def get_target(reader,stage,diagnostics):
+        nonlocal image
+
+        def fresh_capture():
+            nonlocal image
+            check_window()
+            image=capture()
+            return image
+
+        value,image=retry_target(image,mode,lambda frame:timings.measure(stage,lambda:reader(frame)),
+                                 fresh_capture,diagnostics,
+                                 sleep=lambda seconds:timings.measure('target_retry_wait',lambda:time.sleep(seconds)))
+        return value
 
     def get_lives(frame):
         try:
@@ -107,7 +121,7 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
                 lives=get_lives(image)
             if mode=='flags':
                 try:
-                    flag_target=timings.measure('flag_target',lambda:(flag_target_reader or read_flag_target)(image))
+                    flag_target=get_target(flag_target_reader or read_flag_target,'flag_target',folder/'target-retries')
                 except ValueError as error:
                     print(error)
                     flag_target=int(input('Objetivo de nuevas banderas: '))
@@ -118,7 +132,7 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
                 print(f'Objetivo: {flag_target} nuevas banderas. Solo clics derechos.')
             if mode=='opens':
                 try:
-                    open_target=timings.measure('open_target',lambda:(open_target_reader or read_open_target)(image))
+                    open_target=get_target(open_target_reader or read_open_target,'open_target',folder/'target-retries')
                 except ValueError as error:
                     print(error)
                     open_target=int(input('Objetivo de aperturas restantes: '))
@@ -129,6 +143,12 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
                 print(f'Objetivo: {open_target} aperturas seguras. Solo clics izquierdos.')
             save_mode()
             print(f'Modo: {mode}'+(f'; vidas: {lives}.' if mode in ('treasure','opens') else '.'))
+            if mode in ('flags','opens'):
+                # La lectura del objetivo puede haber requerido capturas nuevas.
+                cv2.imwrite(str(folder/'before.png'),image)
+                outcome=timings.measure('outcome',lambda:detect_outcome(image,face_tracker))
+                if outcome:
+                    return finish(output,outcome,turn-1)
         if mode in ('treasure','opens') and lives==0:
             return finish(output,'lives_exhausted',turn-1)
         if mode=='flags' and flags_placed>=flag_target:
