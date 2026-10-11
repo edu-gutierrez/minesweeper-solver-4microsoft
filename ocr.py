@@ -1,6 +1,7 @@
 """Lee números y banderas confirmadas del desafío en el tema proporcionado."""
 
 import argparse
+import copy
 import json
 import shutil
 from pathlib import Path
@@ -108,20 +109,41 @@ def read_cell(crop, detected=True):
     return {**result, "flag_visible": False}
 
 
-def read_board(image, grid):
+def read_board(image, grid, previous_image=None, previous_grid=None, previous_reading=None):
+    """Reutiliza lecturas automáticas solo con la misma geometría y recortes idénticos.
+
+    La memoria pertenece al ciclo actual. Nunca reutiliza lecturas dudosas ni
+    correcciones manuales, y no transfiere información entre partidas.
+    """
     board, details, flags_visible = [], [], []
+    cache_ok = (previous_image is not None and previous_reading is not None
+                and previous_grid is not None and image.shape == previous_image.shape
+                and all(grid.get(key) == previous_grid.get(key) for key in
+                        ('rows', 'cols', 'cell_size', 'x_centers', 'y_centers')))
+    reused, recognized = 0, 0
     half = round(grid["cell_size"] * 0.36)
     for r, y in enumerate(grid["y_centers"]):
         row, statuses = [], []
         for c, x in enumerate(grid["x_centers"]):
             crop = image[round(y)-half:round(y)+half+1, round(x)-half:round(x)+half+1]
-            result = read_cell(crop, detected=grid["detected"][r][c])
+            result = None
+            if cache_ok and grid['detected'][r][c] == previous_grid['detected'][r][c]:
+                old = previous_reading['details'][r][c]
+                old_crop = previous_image[round(y)-half:round(y)+half+1, round(x)-half:round(x)+half+1]
+                if old.get('value') is not None and old.get('status') not in ('manual', 'uncertain', 'unclassified') and np.array_equal(crop, old_crop):
+                    result = copy.deepcopy(old)
+                    result['reused'] = True
+                    reused += 1
+            if result is None:
+                result = read_cell(crop, detected=grid["detected"][r][c])
+                recognized += 1
             row.append(result["value"])
             statuses.append(result)
         board.append(row)
         details.append(statuses)
         flags_visible.append([item["flag_visible"] for item in statuses])
-    return {"board": board, "details": details, "flags_visible": flags_visible}
+    return {"board": board, "details": details, "flags_visible": flags_visible,
+            "reuse_stats": {"reused_cells": reused, "recognized_cells": recognized}}
 
 
 def draw_readings(image, grid, result):

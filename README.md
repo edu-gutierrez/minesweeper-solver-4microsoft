@@ -162,3 +162,23 @@ result.json indica el motivo final. Sin --loop sigue ejecutando una sola ronda.
 Detector final comprobado con las capturas de victoria, derrota y partida activa,
 tanto a tamaño original como a mitad de escala. El bucle se ha verificado con
 pruebas simuladas; todavía falta una partida completa en vivo.
+
+## Lectura incremental y tiempos
+
+En el bucle, las casillas con recortes idénticos conservan su lectura automática.
+Solo se analiza otra vez el contenido que cambia; esto evita ejecutar Tesseract
+en todos los números abiertos después de cada jugada. La geometría y el tamaño
+de imagen deben coincidir. Las lecturas dudosas y correcciones manuales no se
+reutilizan. La memoria es local a una ejecución y se descarta al iniciar otra.
+
+La terminal muestra cuántas casillas se reutilizan y los tiempos de la última
+llamada de cada etapa. timings.json guarda llamadas, segundos acumulados y última
+duración de captura, estabilidad, mensaje final, cuadrícula, lectura y deducción.
+La estabilidad incluye las capturas realizadas dentro de la espera: ambos tiempos
+no deben sumarse como etapas independientes. Las pausas del ratón no cambian.
+
+Medición local sobre las capturas before/after de la ronda 20 del usuario:
+lectura completa 25,84 s; incremental 0,67 s, con la misma matriz y las mismas
+banderas visibles. Se reutilizaron 61 casillas y se analizaron tres. Es una
+medición de reconocimiento de esa ronda, no del tiempo total entre clics ni de
+una partida completa con la versión optimizada.

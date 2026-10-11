@@ -15,6 +15,7 @@ from analyze import correct_uncertain, solve_reading, draw_deductions
 from ocr import configure_tesseract, read_board
 from vision import detect_grid
 from game_state import detect_outcome, wait_stable, stability_region, similar
+from profiling import Timings
 
 
 def window_rect(user32, hwnd):
@@ -27,27 +28,31 @@ def window_rect(user32, hwnd):
 def play(capture, click, check_window, output, execute=False, loop=False, max_rounds=200):
     """Motor con adaptadores para probar el flujo sin controlar el ordenador."""
     output.mkdir(parents=True, exist_ok=True)
-    image = wait_stable(capture)
+    timings = Timings(output/'timings.json')
+    original_capture = capture
+    capture = lambda: timings.measure('capture',original_capture)
+    image = timings.measure('stability',lambda:wait_stable(capture))
     reading = None
     for turn in range(1, (max_rounds if loop else 1)+1):
         folder = output / f'round-{turn:03d}'
         folder.mkdir(parents=True,exist_ok=True)
         cv2.imwrite(str(folder/'before.png'),image)
-        outcome = detect_outcome(image)
+        outcome = timings.measure('outcome',lambda:detect_outcome(image))
         if outcome:
             return finish(output,outcome,turn-1)
-        grid = detect_grid(image)
+        grid = timings.measure('grid',lambda:detect_grid(image))
         if reading is None:
-            reading = read_board(image,grid)
+            reading = timings.measure('reading',lambda:read_board(image,grid))
         correct_uncertain(image,grid,reading,folder/'corrections')
         if reading.get('manual_corrections'):
             print('Corrección recibida. Devuelve el foco a Minesweeper en 5 segundos.')
             time.sleep(5)
-        solved = solve_reading(reading)
+        solved = timings.measure('deduction',lambda:solve_reading(reading))
         plan = plan_actions(reading['board'],solved,reading['flags_visible'],grid)
         (folder/'plan.json').write_text(json.dumps({'reading':reading,'grid':grid,'actions':plan},indent=2),encoding='utf-8')
         cv2.imwrite(str(folder/'plan.png'),draw_deductions(image,grid,reading['board'],solved))
         print(f'Ronda {turn}: {sum(a["button"]=="right" for a in plan)} banderas y {sum(a["button"]=="left" for a in plan)} apertura.')
+        timings.report()
         if not execute:
             return finish(output,'preview',turn)
         if not plan:
@@ -59,15 +64,18 @@ def play(capture, click, check_window, output, execute=False, loop=False, max_ro
         for action in plan:
             check_window()
             click(action)
-        after = wait_stable(capture,grid)
+        after = timings.measure('stability',lambda:wait_stable(capture,grid))
         cv2.imwrite(str(folder/'after.png'),after)
-        outcome = detect_outcome(after)
+        outcome = timings.measure('outcome',lambda:detect_outcome(after))
         if outcome:
             return finish(output,outcome,turn)
-        after_grid = detect_grid(after)
+        after_grid = timings.measure('grid',lambda:detect_grid(after))
         if (after_grid['rows'],after_grid['cols']) != (grid['rows'],grid['cols']):
             raise RuntimeError('La cuadrícula cambió; ejecución detenida.')
-        updated = read_board(after,after_grid)
+        updated = timings.measure('reading',lambda:read_board(
+            after,after_grid,previous_image=image,previous_grid=grid,previous_reading=reading))
+        stats = updated.get('reuse_stats',{})
+        print(f'Lectura: {stats.get("reused_cells",0)} casillas reutilizadas; {stats.get("recognized_cells",0)} analizadas.')
         correct_uncertain(after,after_grid,updated,folder/'after-corrections')
         if updated.get('manual_corrections'):
             print('Corrección recibida. Devuelve el foco a Minesweeper en 5 segundos.')
