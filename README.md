@@ -17,10 +17,12 @@ sobre una matriz. Aún no captura la pantalla ni hace clics.
 
 ## Ejecutar
 
-Requiere Python 3.10 o posterior. No necesita paquetes externos.
+Requiere Python 3.10 o posterior. El solver usa la biblioteca estándar;
+el detector necesita OpenCV y NumPy.
 
 ```console
 python solver.py
+python -m pip install -r requirements.txt
 python -m unittest discover -s tests -v
 ```
 
@@ -37,5 +39,23 @@ se comparan hasta que no aparecen más restricciones.
 Los estados `f` y `o` se tratan como certezas, por lo que deben estar justificados.
 Las pistas incompatibles producen `ValueError`.
 
-Pendiente: probabilidades, reconocimiento de pantalla,
+## Detector de cuadrícula
+
+```console
+python vision.py captura.png --output grid-preview.png
+```
+
+Aplica Canny, filtra contornos aproximadamente cuadrados, selecciona una medida
+repetida y el mayor conjunto conectado con separación regular. Reconstruye los
+centros de filas y columnas. Guarda una imagen superpuesta y un JSON con los
+centros y una máscara de contornos detectados. Verde: contorno detectado; naranja:
+posición reconstruida sin contorno. Las posiciones naranjas no se clasifican aún
+como huecos, porque también podrían deberse a un fallo de detección.
+
+Validado con la captura proporcionada de Banderas Fácil: 16 × 16 posiciones,
+240 casillas detectadas y 16 posiciones centrales sin contorno. Esa captura
+personal no se incluye en el repositorio. No se garantiza aún la detección de
+otros temas, escalas, tableros parcialmente ocultos o ventanas con diálogos.
+
+Pendiente: probabilidades, reconocimiento del contenido de las casillas,
 condiciones de cada desafío y control del ratón.
