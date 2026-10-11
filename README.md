@@ -74,9 +74,16 @@ queda como dudoso. Se exige una confianza de al menos 40; ese valor no equivale 
 probabilidad calibrada. Casillas blancas sin trazos se leen como 0. Las lecturas
 fallidas llevan `status: uncertain` y una exclamación roja en la imagen.
 
-El JSON contiene una matriz parcial: números reconocidos y `null` para las demás
+El JSON contiene una matriz parcial: números reconocidos, `f` para banderas
+confirmadas del desafío y `null` para las demás
 posiciones, junto con estados y confianza. No debe pasarse aún al solver.
-No clasifica tapadas, banderas, minas ni huecos. Validado visualmente sobre las
+La matriz `flags_visible` registra por separado qué minas ya están marcadas.
+El detector de banderas exige fondo amarillo y símbolo rojo; no basta con el fondo.
+Este lector asume las banderas confirmadas del propio desafío, como se acordó;
+no debe usarse esa confianza para banderas arbitrarias de una partida manual.
+Comprobado con cuatro banderas en la primera captura y dos en la segunda, sin
+confundir la marca verde de interrogación. No controla todavía el ratón.
+No clasifica tapadas, minas visibles ni huecos. Validado visualmente sobre las
 dos capturas del tablero; la última contiene 42 dígitos reconocidos y cinco ceros.
 En la primera, un 2 confundido con 4 en uno de los modos obliga a señalar esa
 casilla como dudosa por desacuerdo.

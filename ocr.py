@@ -1,4 +1,4 @@
-"""Lee números de casillas blancas; las demás posiciones quedan sin clasificar."""
+"""Lee números y banderas confirmadas del desafío en el tema proporcionado."""
 
 import argparse
 import json
@@ -72,20 +72,37 @@ def read_digit(crop):
             max((conf for _, conf in readings), default=None)}
 
 
+def is_flag(crop):
+    """Exige fondo amarillo y el símbolo rojo, no solo un color de fondo."""
+    hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
+    hue, saturation, brightness = cv2.split(hsv)
+    yellow = (hue >= 18) & (hue <= 35) & (saturation > 110) & (brightness > 100)
+    red = ((hue <= 12) | (hue >= 170)) & (saturation > 140) & (brightness > 100)
+    return bool(np.mean(yellow) >= 0.45 and np.mean(red) >= 0.03)
+
+
+def read_cell(crop):
+    if is_flag(crop):
+        # El usuario confirmó que las banderas iniciales del desafío son fiables.
+        return {"value": "f", "status": "flag", "confidence": None, "flag_visible": True}
+    return {**read_digit(crop), "flag_visible": False}
+
+
 def read_board(image, grid):
-    board, details = [], []
+    board, details, flags_visible = [], [], []
     half = round(grid["cell_size"] * 0.36)
     for r, y in enumerate(grid["y_centers"]):
         row, statuses = [], []
         for c, x in enumerate(grid["x_centers"]):
             crop = image[round(y)-half:round(y)+half+1, round(x)-half:round(x)+half+1]
-            result = read_digit(crop) if grid["detected"][r][c] else {
-                "value": None, "status": "unclassified", "confidence": None}
+            result = read_cell(crop) if grid["detected"][r][c] else {
+                "value": None, "status": "unclassified", "confidence": None, "flag_visible": False}
             row.append(result["value"])
             statuses.append(result)
         board.append(row)
         details.append(statuses)
-    return {"board": board, "details": details}
+        flags_visible.append([item["flag_visible"] for item in statuses])
+    return {"board": board, "details": details, "flags_visible": flags_visible}
 
 
 def draw_readings(image, grid, result):
