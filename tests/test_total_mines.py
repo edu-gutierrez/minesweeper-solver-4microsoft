@@ -62,6 +62,21 @@ class TotalMinesTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 read_remaining_mines(frame)
 
+    def test_white_and_blue_digits_exclude_frame_and_small_icons(self):
+        for color in [(255,255,255), (210,170,30)]:
+            frame=np.zeros((1000,1900,3),dtype=np.uint8)
+            frame[410:440,1690:1700]=color
+            frame[410:440,1710:1720]=color
+            frame[395:398,1663:1820]=color
+            frame[395:455,1817:1820]=color
+            frame[405:415,1790:1795]=color
+            with patch('mine_counter.pytesseract.image_to_data',
+                       return_value={'text':['69'],'conf':['90']}) as ocr:
+                self.assertEqual(read_remaining_mines(frame),69)
+                glyph=ocr.call_args.args[0]
+                # Only the 30x30 digit region remains before enlargement/margins.
+                self.assertEqual(glyph.shape,(120,120))
+
 
 if __name__=='__main__':
     unittest.main()
