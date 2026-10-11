@@ -211,3 +211,12 @@ de respuestas del OCR. Las lecturas incluyen status: template y template_score.
 Validación: 22 capturas guardadas coinciden con las matrices anteriores. En la
 ronda 20 de referencia, lectura completa 0,39 s e incremental 0,01 s (solo lectura,
 no tiempo total entre acciones). Pendiente validar otros temas/fuentes en vivo.
+
+## OCR del diálogo solo cuando aparece
+
+Sin gafas de victoria, el programa busca una cabecera central amplia, clara y
+de baja saturación. Solo entonces ejecuta Tesseract para leer el resultado.
+Un diálogo durante un lote interrumpe las aperturas para comprobar el mensaje;
+si es ilegible o desconocido, se detiene. Las capturas de partida activa no
+lanzan OCR del resultado. El filtro está ajustado al tema y a los diálogos
+proporcionados y debe validarse si cambia la distribución o el tema.

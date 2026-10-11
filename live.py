@@ -14,7 +14,7 @@ from actions import plan_actions, target_is_covered
 from analyze import correct_uncertain, solve_reading, draw_deductions
 from ocr import configure_tesseract, read_board
 from vision import detect_grid
-from game_state import detect_outcome, wait_stable, stability_region, similar, has_sunglasses
+from game_state import detect_outcome, wait_stable, stability_region, similar, has_sunglasses, possible_result_dialog
 from profiling import Timings
 
 
@@ -70,6 +70,9 @@ def play(capture, click, check_window, output, execute=False, loop=False, max_ro
                 if has_sunglasses(latest):
                     cv2.imwrite(str(folder/'after.png'),latest)
                     return finish(output,'won',turn)
+                if possible_result_dialog(latest):
+                    print('Diálogo detectado; se interrumpe el lote para comprobar el resultado.')
+                    break
                 if not target_is_covered(latest,action,grid):
                     print(f'Omitida fila {action["row"]}, columna {action["col"]}: ya no está tapada o está oculta.')
                     continue

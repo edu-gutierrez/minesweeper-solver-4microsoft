@@ -29,7 +29,8 @@ class WinFaceTests(unittest.TestCase):
         self.assertFalse(has_sunglasses(np.full((600,800,3),30,dtype=np.uint8)))
 
     def test_loss_keeps_popup_ocr(self):
-        with patch('game_state.pytesseract.image_to_string',return_value='Has dado en una mina'):
+        with patch('game_state.possible_result_dialog',return_value=True), \
+             patch('game_state.pytesseract.image_to_string',return_value='Has dado en una mina'):
             self.assertEqual(detect_outcome(np.full((600,800,3),30,dtype=np.uint8)),'lost')
 
     def test_celebration_does_not_wait_for_stability(self):

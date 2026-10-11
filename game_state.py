@@ -47,16 +47,30 @@ def outcome_from_text(text):
     return None
 
 
+def possible_result_dialog(image):
+    """Cabecera grande y clara en el centro; no depende del reloj ni del anuncio."""
+    h,w=image.shape[:2]
+    crop=image[round(h*.23):round(h*.36),round(w*.18):round(w*.82)]
+    hue,saturation,brightness=cv2.split(cv2.cvtColor(crop,cv2.COLOR_BGR2HSV))
+    light_neutral=(brightness>120)&(saturation<100)
+    return bool(np.mean(light_neutral)>.55)
+
+
 def detect_outcome(image):
     if has_sunglasses(image):
         return 'won'
+    if not possible_result_dialog(image):
+        return None
     h,w = image.shape[:2]
     # Solo la cabecera central del diálogo; excluye anuncios y botones.
     crop = image[round(h*.23):round(h*.36), round(w*.18):round(w*.82)]
     gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
     gray = cv2.resize(gray,None,fx=2,fy=2,interpolation=cv2.INTER_CUBIC)
     text = pytesseract.image_to_string(gray,config='--psm 6',timeout=10)
-    return outcome_from_text(text)
+    outcome=outcome_from_text(text)
+    if outcome is None:
+        raise RuntimeError('Hay un diálogo visible, pero no se reconoce el resultado; ejecución detenida.')
+    return outcome
 
 
 def stability_region(image, grid=None):
