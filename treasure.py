@@ -40,7 +40,9 @@ def read_mode(image):
             return 'treasure'
         if normalized.startswith('clasico'):
             return 'classic'
-    raise ValueError('No se reconoce con certeza el modo clásico o tesoro.')
+        if normalized.startswith('banderas'):
+            return 'flags'
+    raise ValueError('No se reconoce con certeza el modo clásico, tesoro o banderas.')
 
 
 def read_lives(image):

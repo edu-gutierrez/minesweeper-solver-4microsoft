@@ -306,3 +306,11 @@ Todas las jugadas seguras mantienen prioridad. Solo al atascarse y con `--guess`
 
 El comando sigue siendo `python live.py --execute --loop --guess --output "..\live-game"`. La estrategia queda registrada en cada apuesta como `treasure_ring` o `lowest_risk`. 120 pruebas pasan: vidas, modos, umbral de riesgo, exclusión de vecinos seguros, desempates, cofre como pista y continuación tras perder una vida. La captura real suministrada reconoce modo tesoro, tres vidas y un único cofre sin casillas dudosas. Prueba completa de la estrategia en la aplicación pendiente.
 
+
+### Banderas
+
+La cabecera `Banderas`, también en contrarreloj, activa `flags`. Lee una sola vez el objetivo verde y el total fijo junto al icono de mina; este total incluye las banderas iniciales proporcionadas por el desafío. El objetivo indica nuevas banderas que debe colocar el bot. Un objetivo dudoso pide corrección manual.
+
+Filtra el plan a clics derechos y lo limita al objetivo pendiente. Nunca abre casillas ni apuesta, incluso con `--guess`. Conserva deducciones `o`/`f` en memoria separada de la lectura visual; las seguras permanecen tapadas pero dejan de contar como posibles minas. Si no hay banderas deducidas, busca certezas por contradicción antes de detenerse con `no_deduced_flags`. Guarda `deductions.json` por ronda y objetivo/progreso en `mode.json`.
+
+Tras el lote comprueba el resultado y verifica las banderas. Si alcanza el objetivo sin confirmación visual de victoria, termina con `flag_target_reached`, sin afirmar que ganó ni colocar más banderas. No se añade OCR del cronómetro. El comando habitual no cambia. La captura suministrada reconoce objetivo10, total100 y produce diez clics derechos sin lecturas dudosas. 128 pruebas pasan, incluyendo límites del lote, ausencia de aperturas/apuestas, memoria lógica y total con banderas iniciales. Ejecución real del modo pendiente.
