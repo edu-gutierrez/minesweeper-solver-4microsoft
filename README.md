@@ -185,3 +185,16 @@ lectura completa 25,84 s; incremental 0,67 s, con la misma matriz y las mismas
 banderas visibles. Se reutilizaron 61 casillas y se analizaron tres. Es una
 medición de reconocimiento de esa ronda, no del tiempo total entre clics ni de
 una partida completa con la versión optimizada.
+
+## Victoria por gafas de sol
+
+Antes de llamar al OCR, busca la cara con gafas en la zona superior derecha
+mediante comparación de plantilla en varias escalas. La referencia recortada
+está en assets/win-face.png. Una coincidencia de al menos 0,88 detiene el juego
+como victoria, incluso durante el confeti, sin esperar estabilidad. También se
+comprueba antes de las aperturas del lote para evitar clics después de ganar.
+Si no aparece, se conserva el OCR del diálogo, incluida la derrota instantánea.
+
+Comprobado con celebración y diálogo de victoria, derrota y dos partidas activas,
+a tamaño original y mitad de escala: victorias superiores a 0,98, otras caras
+inferiores a 0,50. Todavía debe validarse en otros temas y distribuciones de ventana.

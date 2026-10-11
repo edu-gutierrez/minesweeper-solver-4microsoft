@@ -2,10 +2,38 @@
 
 import time
 import unicodedata
+from functools import lru_cache
+from pathlib import Path
 
 import cv2
 import numpy as np
 import pytesseract
+
+
+@lru_cache(maxsize=8)
+def face_templates(height):
+    source=cv2.imread(str(Path(__file__).parent/'assets'/'win-face.png'),cv2.IMREAD_GRAYSCALE)
+    if source is None:
+        raise RuntimeError('No se encontró la plantilla de victoria.')
+    sizes=sorted(set(round(height*fraction) for fraction in np.linspace(.07,.19,31)))
+    return [cv2.resize(source,(round(size*source.shape[1]/source.shape[0]),size)) for size in sizes if size>=20]
+
+
+def sunglasses_score(image):
+    h,w=image.shape[:2]
+    roi=image[round(h*.10):round(h*.52),round(w*.72):round(w*.99)]
+    gray=cv2.cvtColor(roi,cv2.COLOR_BGR2GRAY)
+    score=0.0
+    for template in face_templates(h):
+        if template.shape[0]>gray.shape[0] or template.shape[1]>gray.shape[1]:
+            continue
+        result=cv2.matchTemplate(gray,template,cv2.TM_CCOEFF_NORMED)
+        score=max(score,float(cv2.minMaxLoc(result)[1]))
+    return score
+
+
+def has_sunglasses(image):
+    return sunglasses_score(image)>=.88
 
 
 def outcome_from_text(text):
@@ -20,6 +48,8 @@ def outcome_from_text(text):
 
 
 def detect_outcome(image):
+    if has_sunglasses(image):
+        return 'won'
     h,w = image.shape[:2]
     # Solo la cabecera central del diálogo; excluye anuncios y botones.
     crop = image[round(h*.23):round(h*.36), round(w*.18):round(w*.82)]
@@ -53,6 +83,10 @@ def wait_stable(capture, grid=None, timeout=12, interval=.3, stable_seconds=.9,
     stable_since = None
     while clock()-start < timeout:
         image = capture()
+        # La celebración puede animarse durante más tiempo que el límite.
+        # Las gafas permiten reconocer victoria sin esperar al confeti.
+        if has_sunglasses(image):
+            return image
         region = stability_region(image,grid)
         now = clock()
         if previous is not None and similar(previous,region):

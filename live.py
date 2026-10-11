@@ -14,7 +14,7 @@ from actions import plan_actions, target_is_covered
 from analyze import correct_uncertain, solve_reading, draw_deductions
 from ocr import configure_tesseract, read_board
 from vision import detect_grid
-from game_state import detect_outcome, wait_stable, stability_region, similar
+from game_state import detect_outcome, wait_stable, stability_region, similar, has_sunglasses
 from profiling import Timings
 
 
@@ -67,6 +67,9 @@ def play(capture, click, check_window, output, execute=False, loop=False, max_ro
                 # Una apertura anterior puede haber descubierto esta casilla.
                 # Un diálogo que oscurece/cubre el tablero tampoco se pulsa.
                 latest = capture()
+                if has_sunglasses(latest):
+                    cv2.imwrite(str(folder/'after.png'),latest)
+                    return finish(output,'won',turn)
                 if not target_is_covered(latest,action,grid):
                     print(f'Omitida fila {action["row"]}, columna {action["col"]}: ya no está tapada o está oculta.')
                     continue
