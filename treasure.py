@@ -42,7 +42,9 @@ def read_mode(image):
             return 'classic'
         if normalized.startswith('banderas'):
             return 'flags'
-    raise ValueError('No se reconoce con certeza el modo clásico, tesoro o banderas.')
+        if normalized.startswith('pulsaciones'):
+            return 'opens'
+    raise ValueError('No se reconoce con certeza el modo clásico, tesoro, banderas o pulsaciones.')
 
 
 def read_lives(image):

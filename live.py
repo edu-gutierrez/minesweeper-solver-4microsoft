@@ -22,7 +22,7 @@ from mine_counter import read_remaining_mines
 from probability import mine_probabilities, ProbabilityLimit
 from certainty import find_certainties
 from treasure import read_mode, read_lives, choose_guess
-from flags_mode import read_flag_target, apply_knowledge, flag_plan
+from flags_mode import read_flag_target, read_open_target, apply_knowledge, flag_plan, open_plan, successful_opens
 from solver import deduce
 
 
@@ -34,19 +34,20 @@ def window_rect(user32, hwnd):
 
 
 def play(capture, click, check_window, output, execute=False, loop=False, max_rounds=200,
-         counter_reader=None, guess=False, mode_reader=None, lives_reader=None, flag_target_reader=None):
+         counter_reader=None, guess=False, mode_reader=None, lives_reader=None, flag_target_reader=None,
+         open_target_reader=None):
     """Motor con adaptadores para probar el flujo sin controlar el ordenador."""
     output.mkdir(parents=True, exist_ok=True)
     timings = Timings(output/'timings.json')
     try:
         return _play(capture,click,check_window,output,execute,loop,max_rounds,
-                     counter_reader,guess,timings,mode_reader,lives_reader,flag_target_reader)
+                     counter_reader,guess,timings,mode_reader,lives_reader,flag_target_reader,open_target_reader)
     finally:
         timings.finish()
 
 
 def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_reader,guess,timings,
-          mode_reader=None,lives_reader=None,flag_target_reader=None):
+          mode_reader=None,lives_reader=None,flag_target_reader=None,open_target_reader=None):
     face_tracker=FaceTracker()
     original_capture = capture
     capture = lambda: timings.measure('capture',original_capture)
@@ -58,6 +59,8 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
     lives = None
     flag_target = None
     flags_placed = 0
+    open_target = None
+    opens_done = 0
     knowledge = {}
 
     def get_lives(frame):
@@ -76,6 +79,8 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
         state={'mode':mode,'lives':lives}
         if mode=='flags':
             state.update(flag_target=flag_target,flags_placed=flags_placed)
+        if mode=='opens':
+            state.update(open_target=open_target,opens_done=opens_done)
         (output/'mode.json').write_text(json.dumps(state,indent=2),encoding='utf-8')
     for turn in range(1, (max_rounds if loop else 1)+1):
         folder = output / f'round-{turn:03d}'
@@ -89,15 +94,16 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
                 mode = timings.measure('mode',lambda:mode_reader(image)) if mode_reader else 'classic'
             except ValueError as error:
                 print(error)
-                answer=input('Modo (clasico/tesoro/banderas): ').strip().lower()
+                answer=input('Modo (clasico/tesoro/banderas/pulsaciones): ').strip().lower()
                 mode={'clasico':'classic','clásico':'classic','classic':'classic',
                       'tesoro':'treasure','treasure':'treasure',
-                      'banderas':'flags','flags':'flags'}.get(answer)
+                      'banderas':'flags','flags':'flags',
+                      'pulsaciones':'opens','opens':'opens'}.get(answer)
                 print('Devuelve el foco a Minesweeper en 5 segundos.')
                 time.sleep(5)
-            if mode not in ('classic','treasure','flags'):
-                raise ValueError('Modo no compatible; selecciona clásico, tesoro o banderas.')
-            if mode=='treasure':
+            if mode not in ('classic','treasure','flags','opens'):
+                raise ValueError('Modo no compatible; selecciona clásico, tesoro, banderas o pulsaciones.')
+            if mode in ('treasure','opens'):
                 lives=get_lives(image)
             if mode=='flags':
                 try:
@@ -110,12 +116,25 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
                 if type(flag_target) is not int or flag_target<0:
                     raise ValueError('El objetivo de banderas debe ser un entero no negativo.')
                 print(f'Objetivo: {flag_target} nuevas banderas. Solo clics derechos.')
+            if mode=='opens':
+                try:
+                    open_target=timings.measure('open_target',lambda:(open_target_reader or read_open_target)(image))
+                except ValueError as error:
+                    print(error)
+                    open_target=int(input('Objetivo de aperturas restantes: '))
+                    print('Devuelve el foco a Minesweeper en 5 segundos.')
+                    time.sleep(5)
+                if type(open_target) is not int or open_target<0:
+                    raise ValueError('El objetivo de aperturas debe ser un entero no negativo.')
+                print(f'Objetivo: {open_target} aperturas seguras. Solo clics izquierdos.')
             save_mode()
-            print(f'Modo: {mode}'+(f'; vidas: {lives}.' if mode=='treasure' else '.'))
-        if mode=='treasure' and lives==0:
+            print(f'Modo: {mode}'+(f'; vidas: {lives}.' if mode in ('treasure','opens') else '.'))
+        if mode in ('treasure','opens') and lives==0:
             return finish(output,'lives_exhausted',turn-1)
         if mode=='flags' and flags_placed>=flag_target:
             return finish(output,'flag_target_reached',turn-1)
+        if mode=='opens' and opens_done>=open_target:
+            return finish(output,'open_target_reached',turn-1)
         if reading is None:
             grid = timings.measure('grid',lambda:detect_grid(image))
             reading = timings.measure('reading',lambda:read_board(image,grid))
@@ -136,31 +155,35 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
             initial_flags = sum(sum(row) for row in reading['flags_visible'])
             # En Banderas la cifra junto a la mina indica el total fijo,
             # incluidas las banderas proporcionadas por el desafío.
-            total_mines = remaining if mode=='flags' else remaining + initial_flags
+            total_mines = remaining if mode in ('flags','opens') else remaining + initial_flags
             (output/'mines.json').write_text(json.dumps({
                 'initial_counter':remaining, 'initial_flags':initial_flags,
                 'total_mines':total_mines},indent=2),encoding='utf-8')
             print(f'Total de minas: {total_mines}. Contador leído solo al inicio.')
-        logical = {**reading,'board':apply_knowledge(reading['board'],knowledge)} if mode=='flags' else reading
+        logical = {**reading,'board':apply_knowledge(reading['board'],knowledge)} if mode in ('flags','opens') else reading
         solved = timings.measure('deduction',lambda:solve_reading(logical,total_mines=total_mines))
 
         def make_plan():
             actions=plan_actions(reading['board'],solved,reading['flags_visible'],grid)
-            return flag_plan(actions,flag_target-flags_placed) if mode=='flags' else actions
+            if mode=='flags':
+                return flag_plan(actions,flag_target-flags_placed)
+            if mode=='opens':
+                return open_plan(actions,open_target-opens_done)
+            return actions
 
         plan = make_plan()
         if not plan:
             certainties = timings.measure('certainty',lambda:find_certainties(solved,total_mines))
             for (r,c),mine in certainties.items():
                 solved[r][c] = 'f' if mine else 'o'
-            if mode=='flags' and certainties:
+            if mode in ('flags','opens') and certainties:
                 solved=timings.measure('deduction',lambda:deduce(solved,total_mines))
             plan = make_plan()
             (folder/'certainties.json').write_text(json.dumps([
                 {'row':r+1,'col':c+1,'mine':bool(mine)}
                 for (r,c),mine in sorted(certainties.items())
             ],indent=2),encoding='utf-8')
-        if not plan and guess and mode!='flags':
+        if not plan and guess and mode not in ('flags','opens'):
             if total_mines is None:
                 raise ValueError('Para apostar se requiere el total inicial de minas.')
             try:
@@ -184,7 +207,7 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
                 {'row':r+1,'col':c+1,'mine_probability':float(risk),
                  'fraction':str(risk)} for (r,c),risk in sorted(risks.items())
             ],indent=2),encoding='utf-8')
-        if mode=='flags':
+        if mode in ('flags','opens'):
             knowledge={(r,c):value for r,row in enumerate(solved) for c,value in enumerate(row)
                        if value in ('f','o')}
             (folder/'deductions.json').write_text(json.dumps(solved,indent=2),encoding='utf-8')
@@ -201,6 +224,7 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
         current = capture()
         if not similar(stability_region(image,grid),stability_region(current,grid)):
             raise RuntimeError('El tablero cambió durante el análisis; ejecución detenida.')
+        executed=[]
         for action in plan:
             check_window()
             if action['button'] == 'left':
@@ -217,6 +241,7 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
                     print(f'Omitida fila {action["row"]}, columna {action["col"]}: ya no está tapada o está oculta.')
                     continue
             timings.measure('click',lambda:click(action))
+            executed.append(action)
         after = timings.measure('stability',lambda:wait_stable(capture,grid,tracker=face_tracker))
         cv2.imwrite(str(folder/'after.png'),after)
         outcome = timings.measure('outcome',lambda:detect_outcome(after,face_tracker))
@@ -232,11 +257,15 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
         if updated.get('manual_corrections'):
             print('Corrección recibida. Devuelve el foco a Minesweeper en 5 segundos.')
             time.sleep(5)
-        if mode=='treasure' and any(value=='m' and reading['board'][r][c]!='m'
+        if mode in ('treasure','opens') and any(value=='m' and reading['board'][r][c]!='m'
                                     for r,row in enumerate(updated['board']) for c,value in enumerate(row)):
             lives=get_lives(after)
             save_mode()
             print(f'Vidas restantes: {lives}.')
+            if mode=='opens':
+                # Una mina inesperada invalida la memoria anterior; volver a
+                # deducir desde la lectura actual, sin perpetuar un error.
+                knowledge={}
         failures = []
         for action in plan:
             r,c = action['row']-1,action['col']-1
@@ -246,10 +275,17 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
                 print(f'Mina revelada: fila {r+1}, columna {c+1}; la partida sigue activa.')
             if not valid:
                 failures.append(action)
-        (folder/'verification.json').write_text(json.dumps({'reading':updated,'failed_actions':failures},indent=2),encoding='utf-8')
+        (folder/'verification.json').write_text(json.dumps({'reading':updated,'failed_actions':failures,
+                                                           'executed_actions':executed},indent=2),encoding='utf-8')
         if failures:
             raise RuntimeError('No se verificaron todas las acciones; no se repetirán automáticamente.')
         print('Acciones verificadas.')
+        if mode=='opens':
+            opens_done+=successful_opens(executed,updated['board'])
+            save_mode()
+            print(f'Aperturas verificadas: {opens_done}/{open_target}.')
+            if opens_done>=open_target:
+                return finish(output,'open_target_reached',turn)
         if mode=='flags':
             flags_placed+=len(plan)
             save_mode()

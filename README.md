@@ -1,8 +1,9 @@
 # minesweeper-solver-4microsoft
 
 Proyecto en Python para automatizar los cinco desafíos diarios de Microsoft
-Minesweeper en Windows. Implementa reglas básicas y la regla de subconjuntos
-sobre una matriz. Aún no captura la pantalla ni hace clics.
+Minesweeper en Windows. Lee la pantalla, deduce movimientos sobre una matriz
+y juega con Python. Incluye clásico, tesoro, banderas y pulsaciones;
+el desafío de detonación está pendiente.
 
 ## Estados
 
@@ -14,6 +15,7 @@ sobre una matriz. Aún no captura la pantalla ni hace clics.
 | `f` | Mina deducida; no garantiza que ya se haya colocado bandera |
 | `o` | Casilla segura pendiente de abrir |
 | `b` | Hueco fuera del juego |
+| `t` | Cofre descubierto, seguro, con ocho minas vecinas |
 
 ## Ejecutar
 
@@ -314,3 +316,11 @@ La cabecera `Banderas`, también en contrarreloj, activa `flags`. Lee una sola v
 Filtra el plan a clics derechos y lo limita al objetivo pendiente. Nunca abre casillas ni apuesta, incluso con `--guess`. Conserva deducciones `o`/`f` en memoria separada de la lectura visual; las seguras permanecen tapadas pero dejan de contar como posibles minas. Si no hay banderas deducidas, busca certezas por contradicción antes de detenerse con `no_deduced_flags`. Guarda `deductions.json` por ronda y objetivo/progreso en `mode.json`.
 
 Tras el lote comprueba el resultado y verifica las banderas. Si alcanza el objetivo sin confirmación visual de victoria, termina con `flag_target_reached`, sin afirmar que ganó ni colocar más banderas. No se añade OCR del cronómetro. El comando habitual no cambia. La captura suministrada reconoce objetivo10, total100 y produce diez clics derechos sin lecturas dudosas. 128 pruebas pasan, incluyendo límites del lote, ausencia de aperturas/apuestas, memoria lógica y total con banderas iniciales. Ejecución real del modo pendiente.
+
+### Pulsaciones
+
+La cabecera `Pulsaciones` activa `opens`. Lee una vez el objetivo rojo de aperturas restantes y el total de minas; lee las vidas inicialmente y tras nuevas minas visibles. Si duda del objetivo pide corrección manual. Solo ejecuta aperturas deducidas seguras y busca certezas por contradicción al atascarse. Nunca coloca banderas, apuesta ni elige sacrificar una vida, incluso con `--guess`.
+
+Conserva minas deducidas en memoria sin convertirlas en banderas visibles. Limita cada lote al número de aperturas pendiente. `opens_done` en `mode.json` cuenta únicamente clics realmente enviados y verificados como número/cofre abierto; los destinos omitidos por expansión y las minas reveladas no cuentan. `verification.json` registra `executed_actions`. Una bomba inesperada actualiza las vidas y descarta la memoria lógica anterior para volver a deducir desde la observación actual. Se detiene sin apuestas si no hay aperturas seguras. Si completa el objetivo sin confirmación visual de victoria, retorna `open_target_reached`.
+
+Captura suministrada: modo opens, tres vidas, objetivo15, total86, cero casillas dudosas y seis aperturas seguras en el primer lote (ninguna bandera ejecutable). 135 pruebas pasan, incluyendo destinos omitidos, bombas que no cuentan, límite del lote y minas guardadas sin clic derecho. Ejecución real pendiente. Como el usuario verificó que la aplicación registra mejor los clics con pausa, puede usar `python live.py --execute --loop --guess --click-delay 0.1 --output "..\live-game"`.
