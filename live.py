@@ -225,13 +225,14 @@ def finish(output,reason,rounds):
     return result
 
 
-def click_on_screen(pyautogui,left,top,action,delay=.1):
+def click_on_screen(pyautogui,left,top,action,delay=0):
     """Una pausa explícita; conserva la comprobación fail-safe de PyAutoGUI."""
     pyautogui.click(left+action['x'],top+action['y'],button=action['button'],_pause=False)
-    time.sleep(delay)
+    if delay>0:
+        time.sleep(delay)
 
 
-def run(output, execute=False, loop=False, max_rounds=200, guess=False, click_delay=.1):
+def run(output, execute=False, loop=False, max_rounds=200, guess=False, click_delay=0):
     if not math.isfinite(click_delay) or click_delay < 0:
         raise ValueError('La pausa entre clics debe ser finita y no negativa.')
     # Se carga solo al ejecutar en Windows, no al importar las pruebas.
@@ -278,7 +279,7 @@ if __name__ == '__main__':
     parser.add_argument('--loop',action='store_true',help='Repite el ciclo; requiere --execute.')
     parser.add_argument('--max-rounds',type=int,default=200)
     parser.add_argument('--guess',action='store_true',help='Apuesta por el menor riesgo cuando no hay jugadas seguras.')
-    parser.add_argument('--click-delay',type=float,default=.1,help='Pausa por clic en segundos (0.1 por defecto; 0.3 para el ritmo anterior).')
+    parser.add_argument('--click-delay',type=float,default=0,help='Pausa por clic en segundos (0 por defecto; 0.1 para recuperar la pausa anterior).')
     args = parser.parse_args()
     if args.loop and not args.execute:
         parser.error('--loop requiere --execute.')

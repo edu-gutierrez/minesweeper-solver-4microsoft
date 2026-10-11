@@ -48,7 +48,7 @@ class ClickPauseTests(unittest.TestCase):
         with patch('live.time.sleep') as sleep:
             click_on_screen(api,100,200,action)
         api.click.assert_called_once_with(130,240,button='right',_pause=False)
-        sleep.assert_called_once_with(.1)
+        sleep.assert_not_called()
         self.assertEqual(api.PAUSE,.1)
 
     def test_previous_pace_can_be_restored(self):

@@ -286,7 +286,7 @@ La pausa por clic pasa de aproximadamente 0,3 segundos (0,1 implícitos de PyAut
 python live.py --execute --loop --guess --click-delay 0.3 --output "..\live-game"
 ```
 
-El mismo comando sin `--click-delay` usa 0,1 segundos. El ritmo nuevo se ha probado con adaptadores simulados, pendiente de validar los clics en la aplicación real.
+El mismo comando sin `--click-delay` usa ahora 0 segundos: no llama a `sleep` entre clics y mantiene `_pause=False`. Para recuperar la pausa anterior usa `--click-delay 0.1`. Las comprobaciones de foco, capturas y espera estable siguen activas. Validado con adaptadores simulados; pendiente de probar el ritmo sin pausa en la aplicación real.
 
 Cada llamada de clic se mide como `click` en `timings.json`, incluyendo su pausa. Al terminar, incluso por excepción, `summary.json` guarda el tiempo real transcurrido desde el inicio del motor (excluye la cuenta atrás inicial de cinco segundos), las llamadas al adaptador de clic y su tiempo acumulado. Incluye capturas, análisis, ejecución, escritura de archivos y posibles correcciones manuales. Las etapas individuales pueden solaparse y no deben sumarse para calcular el total. El resumen se muestra también en terminal. 97 pruebas pasan, incluyendo presupuestos de tiempo anidados, finalización tras error, pausas configurables y deducciones contrastadas con todas las distribuciones compatibles de 40 tableros pequeños.
 
@@ -305,3 +305,4 @@ El cofre descubierto se representa como `t`, reconocido por plantilla de forma e
 Todas las jugadas seguras mantienen prioridad. Solo al atascarse y con `--guess`, si quedan más de una vida, favorece centros tapados con ocho vecinos, al menos cuatro minas confirmadas (`f`/`m`), ningún vecino seguro/hueco y riesgo exacto de mina <=50 %. Entre esos candidatos prioriza más minas conocidas, después menor riesgo, y sortea empates restantes. Con una vida, o si no hay candidato admitido, elige el menor riesgo habitual. Un anillo es una preferencia de apuesta, no una prueba de seguridad; se conserva la parada si el cálculo exacto agota su límite.
 
 El comando sigue siendo `python live.py --execute --loop --guess --output "..\live-game"`. La estrategia queda registrada en cada apuesta como `treasure_ring` o `lowest_risk`. 120 pruebas pasan: vidas, modos, umbral de riesgo, exclusión de vecinos seguros, desempates, cofre como pista y continuación tras perder una vida. La captura real suministrada reconoce modo tesoro, tres vidas y un único cofre sin casillas dudosas. Prueba completa de la estrategia en la aplicación pendiente.
+
