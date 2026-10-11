@@ -46,6 +46,35 @@ class SolverTests(unittest.TestCase):
             with self.subTest(board=board), self.assertRaises(ValueError):
                 deduce(board)
 
+    def test_subset_remainder_is_safe(self):
+        board = [[1, 1, "b"], ["?", "?", "?"]]
+        self.assertEqual(deduce(board), [[1, 1, "b"], ["?", "?", "o"]])
+
+    def test_subset_remainder_contains_mines(self):
+        board = [[1, "?", "b"], [3, "?", "b"], ["?", "?", "b"]]
+        self.assertEqual(deduce(board),
+                         [[1, "?", "b"], [3, "?", "b"], ["f", "f", "b"]])
+
+    def test_subset_discounts_known_mines(self):
+        board = [[1, 2, "m"], ["?", "?", "?"]]
+        self.assertEqual(deduce(board), [[1, 2, "m"], ["?", "?", "o"]])
+
+    def test_subset_result_enables_basic_rule(self):
+        board = [[1, 1, "b", 1], ["?", "?", "?", "?"]]
+        self.assertEqual(deduce(board), [[1, 1, "b", 1], ["?", "?", "o", "f"]])
+
+    def test_partial_overlap_does_not_force_cells(self):
+        board = [[1, "b", 1], ["?", "?", "?"]]
+        self.assertEqual(deduce(board), board)
+
+    def test_equal_groups_with_different_mine_counts_fail(self):
+        with self.assertRaises(ValueError):
+            deduce([[1, 2], ["?", "?"]])
+
+    def test_impossible_subset_difference_fails(self):
+        with self.assertRaises(ValueError):
+            deduce([[2, 1, "b"], ["?", "?", "?"]])
+
 
 if __name__ == "__main__":
     unittest.main()

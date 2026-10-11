@@ -1,4 +1,4 @@
-"""Primeras reglas de deducción de Buscaminas, sin controlar la pantalla."""
+"""Deducción básica y por subconjuntos, sin controlar la pantalla."""
 
 Cell = int | str
 Board = list[list[Cell]]
@@ -29,7 +29,7 @@ def validate(board: Board) -> None:
 def deduce(board: Board) -> Board:
     """Devuelve una copia con minas 'f' y casillas seguras 'o' deducidas.
 
-    Repite las dos reglas hasta que ninguna aporte información nueva.
+    Combina reglas básicas y subconjuntos hasta que no hay información nueva.
     'f' debe significar mina confirmada por deducción, no una bandera dudosa.
     Una lectura incompatible provoca un error, nunca una jugada automática.
     """
@@ -40,6 +40,17 @@ def deduce(board: Board) -> Board:
     while True:
         # Reunimos las deducciones antes de aplicarlas para detectar conflictos.
         proposals: dict[tuple[int, int], str] = {}
+        constraints: dict[frozenset[tuple[int, int]], int] = {}
+
+        def add_constraint(cells, mines):
+            cells = frozenset(cells)
+            if not 0 <= mines <= len(cells):
+                raise ValueError("Restricción de minas incompatible.")
+            if cells in constraints and constraints[cells] != mines:
+                raise ValueError("El mismo grupo tiene cantidades de minas contradictorias.")
+            if cells:
+                constraints[cells] = mines
+
         for r, row in enumerate(result):
             for c, number in enumerate(row):
                 if type(number) is not int:
@@ -56,19 +67,32 @@ def deduce(board: Board) -> Board:
                 remaining = number - known_mines
                 if not 0 <= remaining <= len(unknown):
                     raise ValueError(f"Pistas incompatibles en ({r}, {c}).")
-                if not unknown:
-                    continue
-                if remaining == 0:
-                    state = "o"
-                elif remaining == len(unknown):
-                    state = "f"
-                else:
-                    continue
+                add_constraint(unknown, remaining)
 
-                for position in unknown:
-                    if position in proposals and proposals[position] != state:
-                        raise ValueError(f"Deducciones contradictorias en {position}.")
-                    proposals[position] = state
+        # Si A está contenido en B, B - A contiene minas(B) - minas(A).
+        # Los grupos derivados también pueden participar en nuevas restas.
+        while True:
+            previous_count = len(constraints)
+            groups = list(constraints.items())
+            for smaller, small_mines in groups:
+                for larger, large_mines in groups:
+                    if smaller < larger:
+                        add_constraint(larger - smaller, large_mines - small_mines)
+            if len(constraints) == previous_count:
+                break
+
+        for unknown, remaining in constraints.items():
+            if remaining == 0:
+                state = "o"
+            elif remaining == len(unknown):
+                state = "f"
+            else:
+                continue
+
+            for position in unknown:
+                if position in proposals and proposals[position] != state:
+                    raise ValueError(f"Deducciones contradictorias en {position}.")
+                proposals[position] = state
 
         if not proposals:
             return result
