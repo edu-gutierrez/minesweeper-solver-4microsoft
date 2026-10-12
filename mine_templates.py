@@ -28,7 +28,7 @@ def match_mine(crop):
         return None
     score=max(float(cv2.matchTemplate(candidate,reference,cv2.TM_CCOEFF_NORMED)[0,0])
               for reference in templates())
-    if score>=.90:
+    if score>=.85:
         return {'value':'m','status':'mine_template','confidence':None,
                 'template_score':score,'flag_visible':False}
     return None
