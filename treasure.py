@@ -31,7 +31,8 @@ def read_mode(image):
     h,w=image.shape[:2]
     crop=image[round(h*.05):round(h*.113),round(w*.075):round(w*.72)]
     mask=(np.min(crop,axis=2)>190).astype(np.uint8)*255
-    data=pytesseract.image_to_data(255-mask,config='--psm 7',output_type=pytesseract.Output.DICT)
+    enlarged=cv2.resize(255-mask,None,fx=2,fy=2,interpolation=cv2.INTER_NEAREST)
+    data=pytesseract.image_to_data(enlarged,config='--psm 7',output_type=pytesseract.Output.DICT)
     tokens=[(t,float(c)) for t,c in zip(data['text'],data['conf']) if t.strip()]
     text=' '.join(t for t,c in tokens)
     normalized=''.join(c for c in unicodedata.normalize('NFD',text.lower()) if unicodedata.category(c)!='Mn')
@@ -44,7 +45,9 @@ def read_mode(image):
             return 'flags'
         if normalized.startswith('pulsaciones'):
             return 'opens'
-    raise ValueError('No se reconoce con certeza el modo clásico, tesoro, banderas o pulsaciones.')
+        if normalized.startswith('detonacion'):
+            return 'detonate'
+    raise ValueError('No se reconoce con certeza el modo de juego.')
 
 
 def read_lives(image):

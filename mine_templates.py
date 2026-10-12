@@ -16,11 +16,18 @@ def template():
     return normalize(cv2.imread(str(Path(__file__).parent/'assets/mines/revealed.png'),0))
 
 
+@lru_cache(maxsize=1)
+def templates():
+    return [normalize(cv2.imread(str(path),0))
+            for path in sorted((Path(__file__).parent/'assets/mines').glob('*.png'))]
+
+
 def match_mine(crop):
     candidate=normalize(crop)
     if np.std(candidate)<8:
         return None
-    score=float(cv2.matchTemplate(candidate,template(),cv2.TM_CCOEFF_NORMED)[0,0])
+    score=max(float(cv2.matchTemplate(candidate,reference,cv2.TM_CCOEFF_NORMED)[0,0])
+              for reference in templates())
     if score>=.90:
         return {'value':'m','status':'mine_template','confidence':None,
                 'template_score':score,'flag_visible':False}

@@ -68,7 +68,7 @@ class TreasureTests(unittest.TestCase):
         for title,expected in [('Búsqueda del tesoro - Medio','treasure'),('Clásico - Difícil','classic')]:
             with patch('treasure.pytesseract.image_to_data',return_value={'text':[title],'conf':[90]}):
                 self.assertEqual(read_mode(frame),expected)
-        for title,confidence in [('Detonación',90),('Clásico',12)]:
+        for title,confidence in [('Desconocido',90),('Clásico',12)]:
             with patch('treasure.pytesseract.image_to_data',return_value={'text':[title],'conf':[confidence]}):
                 with self.assertRaises(ValueError): read_mode(frame)
 

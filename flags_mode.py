@@ -15,12 +15,19 @@ def read_open_target(image):
     return read_action_target(image,'opens')
 
 
+def read_moves_left(image):
+    return read_action_target(image,'detonate')
+
+
 def read_action_target(image,mode):
     h,w=image.shape[:2]
     crop=target_crop(image,mode)
     hue,saturation,brightness=cv2.split(cv2.cvtColor(crop,cv2.COLOR_BGR2HSV))
-    color=(hue>=30)&(hue<=50) if mode=='flags' else ((hue<=12)|(hue>=170))
-    mask=(color&(saturation>100)&(brightness>100)).astype(np.uint8)*255
+    if mode=='detonate':
+        mask=(np.min(crop,axis=2)>190).astype(np.uint8)*255
+    else:
+        color=(hue>=30)&(hue<=50) if mode=='flags' else ((hue<=12)|(hue>=170))
+        mask=(color&(saturation>100)&(brightness>100)).astype(np.uint8)*255
     count,labels,stats,_=cv2.connectedComponentsWithStats(mask)
     digits=np.zeros_like(mask)
     for i in range(1,count):
@@ -43,7 +50,7 @@ def read_action_target(image,mode):
 
 def target_crop(image,mode):
     h,w=image.shape[:2]
-    top,bottom=(.46,.52) if mode=='flags' else (.52,.59)
+    top,bottom=(.46,.52) if mode in ('flags','detonate') else (.52,.59)
     return image[round(h*top):round(h*bottom),round(w*.88):round(w*.935)]
 
 

@@ -22,8 +22,9 @@ from mine_counter import read_remaining_mines
 from probability import mine_probabilities, ProbabilityLimit
 from certainty import find_certainties
 from treasure import read_mode, read_lives, choose_guess
-from flags_mode import read_flag_target, read_open_target, apply_knowledge, flag_plan, open_plan, successful_opens, retry_target
+from flags_mode import read_flag_target, read_open_target, read_moves_left, apply_knowledge, flag_plan, open_plan, successful_opens, retry_target
 from solver import deduce
+from detonation import plan_detonations, choose_detonation, newly_revealed_mines
 
 
 def window_rect(user32, hwnd):
@@ -35,19 +36,19 @@ def window_rect(user32, hwnd):
 
 def play(capture, click, check_window, output, execute=False, loop=False, max_rounds=200,
          counter_reader=None, guess=False, mode_reader=None, lives_reader=None, flag_target_reader=None,
-         open_target_reader=None):
+         open_target_reader=None, moves_reader=None):
     """Motor con adaptadores para probar el flujo sin controlar el ordenador."""
     output.mkdir(parents=True, exist_ok=True)
     timings = Timings(output/'timings.json')
     try:
         return _play(capture,click,check_window,output,execute,loop,max_rounds,
-                     counter_reader,guess,timings,mode_reader,lives_reader,flag_target_reader,open_target_reader)
+                     counter_reader,guess,timings,mode_reader,lives_reader,flag_target_reader,open_target_reader,moves_reader)
     finally:
         timings.finish()
 
 
 def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_reader,guess,timings,
-          mode_reader=None,lives_reader=None,flag_target_reader=None,open_target_reader=None):
+          mode_reader=None,lives_reader=None,flag_target_reader=None,open_target_reader=None,moves_reader=None):
     face_tracker=FaceTracker()
     original_capture = capture
     capture = lambda: timings.measure('capture',original_capture)
@@ -61,6 +62,8 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
     flags_placed = 0
     open_target = None
     opens_done = 0
+    moves_left = None
+    mines_left = None
     knowledge = {}
 
     def get_target(reader,stage,diagnostics):
@@ -95,6 +98,8 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
             state.update(flag_target=flag_target,flags_placed=flags_placed)
         if mode=='opens':
             state.update(open_target=open_target,opens_done=opens_done)
+        if mode=='detonate':
+            state.update(moves_left=moves_left,mines_left=mines_left)
         (output/'mode.json').write_text(json.dumps(state,indent=2),encoding='utf-8')
     for turn in range(1, (max_rounds if loop else 1)+1):
         folder = output / f'round-{turn:03d}'
@@ -108,15 +113,16 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
                 mode = timings.measure('mode',lambda:mode_reader(image)) if mode_reader else 'classic'
             except ValueError as error:
                 print(error)
-                answer=input('Modo (clasico/tesoro/banderas/pulsaciones): ').strip().lower()
+                answer=input('Modo (clasico/tesoro/banderas/pulsaciones/detonacion): ').strip().lower()
                 mode={'clasico':'classic','clásico':'classic','classic':'classic',
                       'tesoro':'treasure','treasure':'treasure',
                       'banderas':'flags','flags':'flags',
-                      'pulsaciones':'opens','opens':'opens'}.get(answer)
+                      'pulsaciones':'opens','opens':'opens',
+                      'detonacion':'detonate','detonación':'detonate','detonate':'detonate'}.get(answer)
                 print('Devuelve el foco a Minesweeper en 5 segundos.')
                 time.sleep(5)
-            if mode not in ('classic','treasure','flags','opens'):
-                raise ValueError('Modo no compatible; selecciona clásico, tesoro, banderas o pulsaciones.')
+            if mode not in ('classic','treasure','flags','opens','detonate'):
+                raise ValueError('Modo no compatible.')
             if mode in ('treasure','opens'):
                 lives=get_lives(image)
             if mode=='flags':
@@ -141,9 +147,20 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
                 if type(open_target) is not int or open_target<0:
                     raise ValueError('El objetivo de aperturas debe ser un entero no negativo.')
                 print(f'Objetivo: {open_target} aperturas seguras. Solo clics izquierdos.')
+            if mode=='detonate':
+                try:
+                    moves_left=get_target(moves_reader or read_moves_left,'moves',folder/'target-retries')
+                except ValueError as error:
+                    print(error)
+                    moves_left=int(input('Movimientos restantes: '))
+                    print('Devuelve el foco a Minesweeper en 5 segundos.')
+                    time.sleep(5)
+                if type(moves_left) is not int or moves_left<0:
+                    raise ValueError('Los movimientos deben ser un entero no negativo.')
+                print(f'Movimientos disponibles: {moves_left}. Solo clics izquierdos para detonar.')
             save_mode()
             print(f'Modo: {mode}'+(f'; vidas: {lives}.' if mode in ('treasure','opens') else '.'))
-            if mode in ('flags','opens'):
+            if mode in ('flags','opens','detonate'):
                 # La lectura del objetivo puede haber requerido capturas nuevas.
                 cv2.imwrite(str(folder/'before.png'),image)
                 outcome=timings.measure('outcome',lambda:detect_outcome(image,face_tracker))
@@ -155,6 +172,8 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
             return finish(output,'flag_target_reached',turn-1)
         if mode=='opens' and opens_done>=open_target:
             return finish(output,'open_target_reached',turn-1)
+        if mode=='detonate' and moves_left==0:
+            return finish(output,'moves_exhausted',turn-1)
         if reading is None:
             grid = timings.measure('grid',lambda:detect_grid(image))
             reading = timings.measure('reading',lambda:read_board(image,grid))
@@ -162,9 +181,9 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
         if reading.get('manual_corrections'):
             print('Corrección recibida. Devuelve el foco a Minesweeper en 5 segundos.')
             time.sleep(5)
-        if total_mines is None and counter_reader is not None:
+        if total_mines is None and (counter_reader is not None or mode=='detonate'):
             try:
-                remaining = counter_reader(image)
+                remaining = (counter_reader or read_remaining_mines)(image)
             except ValueError as error:
                 print(f'{error} Introduce el valor que muestra el contador.')
                 remaining = int(input('Minas restantes: '))
@@ -176,14 +195,23 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
             # En Banderas la cifra junto a la mina indica el total fijo,
             # incluidas las banderas proporcionadas por el desafío.
             total_mines = remaining if mode in ('flags','opens') else remaining + initial_flags
+            if mode=='detonate':
+                mines_left=remaining
+                # El contador morado excluye las minas ya detonadas visibles.
+                total_mines=remaining+sum(v=='m' for row in reading['board'] for v in row)
+                save_mode()
             (output/'mines.json').write_text(json.dumps({
                 'initial_counter':remaining, 'initial_flags':initial_flags,
                 'total_mines':total_mines},indent=2),encoding='utf-8')
             print(f'Total de minas: {total_mines}. Contador leído solo al inicio.')
-        logical = {**reading,'board':apply_knowledge(reading['board'],knowledge)} if mode in ('flags','opens') else reading
+        if mode=='detonate' and mines_left==0:
+            return finish(output,'detonation_target_reached',turn-1)
+        logical = {**reading,'board':apply_knowledge(reading['board'],knowledge)} if mode in ('flags','opens','detonate') else reading
         solved = timings.measure('deduction',lambda:solve_reading(logical,total_mines=total_mines))
 
         def make_plan():
+            if mode=='detonate':
+                return plan_detonations(reading['board'],solved,grid,moves_left)
             actions=plan_actions(reading['board'],solved,reading['flags_visible'],grid)
             if mode=='flags':
                 return flag_plan(actions,flag_target-flags_placed)
@@ -196,7 +224,7 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
             certainties = timings.measure('certainty',lambda:find_certainties(solved,total_mines))
             for (r,c),mine in certainties.items():
                 solved[r][c] = 'f' if mine else 'o'
-            if mode in ('flags','opens') and certainties:
+            if mode in ('flags','opens','detonate') and certainties:
                 solved=timings.measure('deduction',lambda:deduce(solved,total_mines))
             plan = make_plan()
             (folder/'certainties.json').write_text(json.dumps([
@@ -215,31 +243,40 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
             for (r,c),risk in risks.items():
                 if risk in (0,1):
                     solved[r][c] = 'o' if risk==0 else 'f'
-            plan = plan_actions(reading['board'],solved,reading['flags_visible'],grid)
+            plan = make_plan()
             if not plan and risks:
-                (r,c),strategy=choose_guess(solved,risks,mode,lives)
+                if mode=='detonate':
+                    r,c=choose_detonation(risks)
+                    strategy='highest_mine_probability'
+                else:
+                    (r,c),strategy=choose_guess(solved,risks,mode,lives)
                 lowest=risks[(r,c)]
                 plan = [{'row':r+1,'col':c+1,'x':round(grid['x_centers'][c]),
                          'y':round(grid['y_centers'][r]),'button':'left',
                          'guess':True,'mine_probability':float(lowest),'strategy':strategy}]
-                print(f'Apuesta: fila {r+1}, columna {c+1}; riesgo de mina {float(lowest):.1%}; {strategy}.')
+                label='probabilidad de mina' if mode=='detonate' else 'riesgo de mina'
+                print(f'Apuesta: fila {r+1}, columna {c+1}; {label} {float(lowest):.1%}; {strategy}.')
             (folder/'probabilities.json').write_text(json.dumps([
                 {'row':r+1,'col':c+1,'mine_probability':float(risk),
                  'fraction':str(risk)} for (r,c),risk in sorted(risks.items())
             ],indent=2),encoding='utf-8')
-        if mode in ('flags','opens'):
+        if mode in ('flags','opens','detonate'):
             knowledge={(r,c):value for r,row in enumerate(solved) for c,value in enumerate(row)
                        if value in ('f','o')}
             (folder/'deductions.json').write_text(json.dumps(solved,indent=2),encoding='utf-8')
         (folder/'plan.json').write_text(json.dumps({'reading':reading,'grid':grid,'actions':plan,
                                                   'mode':mode,'lives':lives},indent=2),encoding='utf-8')
         cv2.imwrite(str(folder/'plan.png'),draw_deductions(image,grid,reading['board'],solved))
-        print(f'Ronda {turn}: {sum(a["button"]=="right" for a in plan)} banderas y {sum(a["button"]=="left" for a in plan)} apertura.')
+        if mode=='detonate':
+            print(f'Ronda {turn}: {len(plan)} detonaciones previstas.')
+        else:
+            print(f'Ronda {turn}: {sum(a["button"]=="right" for a in plan)} banderas y {sum(a["button"]=="left" for a in plan)} apertura.')
         timings.report()
         if not execute:
             return finish(output,'preview',turn)
         if not plan:
-            return finish(output,'no_deduced_flags' if mode=='flags' else 'no_safe_moves',turn)
+            reason='no_deduced_flags' if mode=='flags' else 'no_deduced_mines' if mode=='detonate' else 'no_safe_moves'
+            return finish(output,reason,turn)
         check_window()
         current = capture()
         if not similar(stability_region(image,grid),stability_region(current,grid)):
@@ -262,10 +299,16 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
                     continue
             timings.measure('click',lambda:click(action))
             executed.append(action)
+        if mode=='detonate':
+            moves_left-=len(executed)
+            save_mode()
         after = timings.measure('stability',lambda:wait_stable(capture,grid,tracker=face_tracker))
         cv2.imwrite(str(folder/'after.png'),after)
         outcome = timings.measure('outcome',lambda:detect_outcome(after,face_tracker))
         if outcome:
+            if mode=='detonate' and outcome=='won':
+                mines_left=0
+                save_mode()
             return finish(output,outcome,turn)
         after_grid = timings.measure('grid',lambda:detect_grid(after))
         after_grid = keep_grid_geometry(grid,after_grid,image,after)
@@ -286,6 +329,12 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
                 # Una mina inesperada invalida la memoria anterior; volver a
                 # deducir desde la lectura actual, sin perpetuar un error.
                 knowledge={}
+        if mode=='detonate':
+            mines_left-=newly_revealed_mines(reading['board'],updated['board'])
+            if mines_left<0:
+                raise ValueError('Las minas visibles contradicen el contador inicial.')
+            save_mode()
+            print(f'Minas pendientes: {mines_left}; movimientos restantes: {moves_left}.')
         failures = []
         for action in plan:
             r,c = action['row']-1,action['col']-1
@@ -299,7 +348,17 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
                                                            'executed_actions':executed},indent=2),encoding='utf-8')
         if failures:
             raise RuntimeError('No se verificaron todas las acciones; no se repetirán automáticamente.')
+        if mode=='detonate':
+            mismatches=[a for a in executed if solved[a['row']-1][a['col']-1]=='f'
+                        and updated['board'][a['row']-1][a['col']-1]!='m']
+            if mismatches:
+                raise RuntimeError('Una mina deducida no resultó ser mina; revisar la lectura antes de continuar.')
         print('Acciones verificadas.')
+        if mode=='detonate':
+            if mines_left==0:
+                return finish(output,'detonation_target_reached',turn)
+            if moves_left==0:
+                return finish(output,'moves_exhausted',turn)
         if mode=='opens':
             opens_done+=successful_opens(executed,updated['board'])
             save_mode()

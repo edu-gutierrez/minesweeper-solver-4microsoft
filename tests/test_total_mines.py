@@ -63,7 +63,7 @@ class TotalMinesTests(unittest.TestCase):
                 read_remaining_mines(frame)
 
     def test_white_and_blue_digits_exclude_frame_and_small_icons(self):
-        for color in [(255,255,255), (210,170,30)]:
+        for color in [(255,255,255), (210,170,30), (210,100,180)]:
             frame=np.zeros((1000,1900,3),dtype=np.uint8)
             frame[410:440,1690:1700]=color
             frame[410:440,1710:1720]=color

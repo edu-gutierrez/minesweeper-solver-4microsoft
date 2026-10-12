@@ -2,8 +2,7 @@
 
 Proyecto en Python para automatizar los cinco desafíos diarios de Microsoft
 Minesweeper en Windows. Lee la pantalla, deduce movimientos sobre una matriz
-y juega con Python. Incluye clásico, tesoro, banderas y pulsaciones;
-el desafío de detonación está pendiente.
+y juega con Python. Incluye clásico, tesoro, banderas, pulsaciones y detonación.
 
 ## Estados
 
@@ -330,3 +329,13 @@ Captura suministrada: modo opens, tres vidas, objetivo15, total86, cero casillas
 Si falla la lectura inicial del objetivo de Banderas o Pulsaciones, conserva el umbral de confianza y espera un segundo antes de una captura nueva. Hay tres intentos totales (dos esperas como máximo); después pide corrección manual. Una primera lectura válida no añade ninguna espera. Se comprueba el foco antes de recapturar y la lectura posterior del tablero usa la imagen más reciente. Se comprueba también el resultado antes de planificar acciones desde esa imagen.
 
 `round-001/target-retries/attempt-NN.png` guarda el recorte original de cada fallo y su JSON guarda el motivo. La espera se registra como `target_retry_wait`. 139 pruebas pasan, incluyendo lectura inicial válida, recuperación con captura diferente, límite de tres fallos y uso de la imagen nueva en el jugador. La recuperación ante destellos reales de la aplicación sigue pendiente de observar; no se rebajó la confianza ni se aceptaron números dudosos.
+
+### Detonación
+
+La cabecera `Detonación`, también en contrarreloj, activa `detonate`. El lector de minas admite morado y el lector de movimientos busca el número blanco junto a la mano. Ambos contadores se leen inicialmente; el presupuesto blanco utiliza los mismos tres intentos con espera de un segundo y corrección manual ante dudas. El total de minas para deducción suma al contador morado las minas `m` que ya aparecen detonadas al iniciar/reanudar.
+
+Conserva las deducciones seguras en memoria, sin abrirlas deliberadamente, y pulsa todas las minas deducidas que estén tapadas, hasta el máximo de movimientos disponible. Son clics izquierdos, sin banderas. La app aplica la revelación en cadena; el jugador omite destinos ya revelados y lee el tablero al terminar el lote. Si no deduce minas, busca certezas; con `--guess` calcula probabilidades exactas y pulsa una sola casilla de probabilidad máxima de mina, sorteando empates. Si el cálculo agota su límite, mantiene la parada `probability_limit`.
+
+`mode.json` guarda `moves_left` y `mines_left`. Cada clic enviado consume un movimiento; las omisiones no consumen. Las nuevas `m` reducen las minas pendientes, mientras una apuesta que abre un número no las reduce. El presupuesto limita el lote y la partida se detiene con `moves_exhausted` al agotarlo. Si queda cero minas sin confirmación visual de victoria, retorna `detonation_target_reached`, sin afirmar `won`. Una mina deducida que no resulta ser mina provoca parada para revisar la lectura.
+
+Se añade una referencia de bomba de fila12,columna12 de la captura suministrada, conservando comparación de forma en gris y umbral0,90. La cabecera se amplía antes del OCR para leer correctamente la palabra Detonación. Las cinco capturas de cabeceras proporcionadas se reconocen; la captura de Detonación lee 92 minas pendientes, 93 movimientos, una bomba visible, cero dudas y siete detonaciones deducidas. 147 pruebas pasan, incluyendo lote, presupuesto, máxima probabilidad, reanudación y efectos de revelación. Partida real de Detonación pendiente. Comando: `python live.py --execute --loop --guess --click-delay 0.1 --output "..\live-game"`.

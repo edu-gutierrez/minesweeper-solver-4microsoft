@@ -6,7 +6,7 @@ import pytesseract
 
 
 def read_remaining_mines(image):
-    """Lee una vez los dígitos blancos o azules a la derecha del icono de mina.
+    """Lee una vez los dígitos blancos, azules o morados junto al icono de mina.
 
     La región es relativa al tamaño de la ventana, como el detector del emoji.
     Una lectura dudosa exige introducir el contador; nunca inventa un total.
@@ -16,7 +16,8 @@ def read_remaining_mines(image):
                  round(width*.875):round(width*.97)]
     hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
     blue = cv2.inRange(hsv, (85, 100, 120), (110, 255, 255))
-    mask = ((np.min(crop, axis=2) > 190) | (blue > 0)).astype(np.uint8)*255
+    purple = cv2.inRange(hsv, (130, 70, 100), (160, 255, 255))
+    mask = ((np.min(crop, axis=2) > 190) | (blue > 0) | (purple > 0)).astype(np.uint8)*255
     # El marco azul y sus destellos no son parte de los dígitos.
     count, labels, stats, _ = cv2.connectedComponentsWithStats(mask)
     digits = np.zeros_like(mask)
