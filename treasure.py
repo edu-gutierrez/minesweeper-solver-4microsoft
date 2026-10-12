@@ -31,22 +31,24 @@ def read_mode(image):
     h,w=image.shape[:2]
     crop=image[round(h*.05):round(h*.113),round(w*.075):round(w*.72)]
     mask=(np.min(crop,axis=2)>190).astype(np.uint8)*255
-    enlarged=cv2.resize(255-mask,None,fx=2,fy=2,interpolation=cv2.INTER_NEAREST)
-    data=pytesseract.image_to_data(enlarged,config='--psm 7',output_type=pytesseract.Output.DICT)
-    tokens=[(t,float(c)) for t,c in zip(data['text'],data['conf']) if t.strip()]
-    text=' '.join(t for t,c in tokens)
-    normalized=''.join(c for c in unicodedata.normalize('NFD',text.lower()) if unicodedata.category(c)!='Mn')
-    if tokens and all(c>=40 for _,c in tokens):
-        if normalized.startswith('busqueda del tesoro'):
-            return 'treasure'
-        if normalized.startswith('clasico'):
-            return 'classic'
-        if normalized.startswith('banderas'):
-            return 'flags'
-        if normalized.startswith('pulsaciones'):
-            return 'opens'
-        if normalized.startswith('detonacion'):
-            return 'detonate'
+    # Segundo intento solo ante una lectura dudosa, sin reducir confianza.
+    for scale in (2,4):
+        enlarged=cv2.resize(255-mask,None,fx=scale,fy=scale,interpolation=cv2.INTER_NEAREST)
+        data=pytesseract.image_to_data(enlarged,config='--psm 7',output_type=pytesseract.Output.DICT)
+        tokens=[(t,float(c)) for t,c in zip(data['text'],data['conf']) if t.strip()]
+        text=' '.join(t for t,c in tokens)
+        normalized=''.join(c for c in unicodedata.normalize('NFD',text.lower()) if unicodedata.category(c)!='Mn')
+        if tokens and all(c>=40 for _,c in tokens):
+            if normalized.startswith('busqueda del tesoro'):
+                return 'treasure'
+            if normalized.startswith('clasico'):
+                return 'classic'
+            if normalized.startswith('banderas'):
+                return 'flags'
+            if normalized.startswith('pulsaciones'):
+                return 'opens'
+            if normalized.startswith('detonacion'):
+                return 'detonate'
     raise ValueError('No se reconoce con certeza el modo de juego.')
 
 

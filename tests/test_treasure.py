@@ -15,6 +15,16 @@ from live import play
 
 
 class TreasureTests(unittest.TestCase):
+    def test_mode_retries_larger_header_without_lowering_confidence(self):
+        frame=np.zeros((1000,1900,3),dtype=np.uint8)
+        with patch('treasure.pytesseract.image_to_data',side_effect=[
+                {'text':['Detonacion','Medio'],'conf':[29,96]},
+                {'text':['Detonacion','Medio'],'conf':[80,96]}]) as reader:
+            self.assertEqual(read_mode(frame),'detonate')
+            self.assertEqual(reader.call_count,2)
+            self.assertEqual(reader.call_args_list[1].args[0].shape[0],
+                             reader.call_args_list[0].args[0].shape[0]*2)
+
     def rings(self):
         board=[['?']*7 for _ in range(7)]
         for center,count in [((1,1),7),((5,5),4)]:
