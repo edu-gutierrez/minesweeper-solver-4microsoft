@@ -28,6 +28,7 @@ from solver import deduce
 from detonation import plan_detonations, choose_detonation, newly_revealed_mines
 from flag_recovery import recover_flags
 from open_recovery import recover_opens
+from delayed_guess import wait_for_guess
 from approximate_probability import estimate_probabilities
 
 
@@ -368,6 +369,19 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
                 print('Corrección recibida. Devuelve el foco a Minesweeper en 5 segundos.')
                 time.sleep(5)
             return fresh,fresh_reading,None
+        delayed_state,guess_recaptures=wait_for_guess(executed,updated,refresh_flags,
+            sleep=lambda seconds:timings.measure('guess_wait',lambda:time.sleep(seconds)))
+        if delayed_state is not None:
+            after,updated,outcome=delayed_state
+            cv2.imwrite(str(folder/'after.png'),after)
+            (folder/'guess-wait.json').write_text(json.dumps({'recaptures':guess_recaptures,
+                'outcome':outcome,'reading':updated},indent=2),encoding='utf-8')
+            print(f'Comprobación de apuesta tardía: {guess_recaptures} recapturas; sin repetir clic.')
+            if outcome:
+                if mode=='detonate' and outcome=='won':
+                    mines_left=0
+                    save_mode()
+                return finish(output,outcome,turn)
         recovered,retried=recover_flags(plan,updated,refresh_flags,capture,
             lambda action:timings.measure('click',lambda:click(action)),check_window,grid)
         if recovered is not None:
