@@ -1,24 +1,17 @@
-# Gameplay GIF slots / Espacios para GIFs
+# Gameplay recordings
 
-Add recordings here and uncomment the corresponding README block. The GIF files do not exist yet; the placeholders are intentional.
+These five GIFs show the bot playing Microsoft Minesweeper. Both project READMEs use the same files.
 
-Añade aquí las grabaciones y descomenta los bloques correspondientes. Los GIFs aún no existen; los espacios son intencionados.
-
-| File | Suggested recording / Grabación sugerida |
+| File | Mode |
 | --- | --- |
-| `classic.gif` | Safe batches and a completed classic game / Lotes seguros y victoria clásica |
-| `flags.gif` | Flags-only objective / Objetivo de banderas |
-| `detonation.gif` | Confirmed mines and chain reveals / Minas confirmadas y revelación en cadena |
-| `treasure.gif` | Finding the chest / Encontrar el cofre |
-| `taps.gif` | Safe openings without flags / Aperturas seguras sin banderas |
-| `daily-challenges.gif` | Navigation between cards and days / Navegación entre tarjetas y días |
+| `classic.gif` | Classic |
+| `flags.gif` | Flags |
+| `detonation.gif` | Detonation |
+| `treasure.gif` | Treasure Hunt |
+| `taps.gif` | Taps |
 
-Copy a block into either README and replace the filename and description:
+There is no recording of the full daily challenge run; it would be too long for a GIF.
 
-```html
-<div align="center">
-<img src="Media/flags.gif" alt="Flags challenge gameplay" width="900">
-</div>
-```
+## Grabaciones
 
-Record the game area. If playback is accelerated, mention the speed in the caption. / Graba la zona de juego. Si aceleras la reproducción, indica la velocidad en el pie.
+Los cinco GIFs muestran al bot jugando a Microsoft Minesweeper. Los README en inglés y español comparten estos archivos. No hay una grabación del recorrido diario completo porque sería demasiado larga para un GIF.

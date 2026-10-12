@@ -2,76 +2,67 @@
 
 > *Read this in [English](README.md)*
 
-Bot en Python que juega a **Microsoft Minesweeper en Windows** leyendo la pantalla, razonando sobre el tablero y controlando el ratón.
+Este proyecto empezó un día que se fue la luz. Como no tenía Wi-Fi, me puse a jugar a Microsoft Minesweeper y descubrí los desafíos diarios. Después de unas partidas pensé: ¿por qué hacerlos todos a mano si un bot puede resolverlos?
 
-Empecé este proyecto para combinar la lógica del Buscaminas con visión por computador. Pasó de resolver tableros introducidos a mano a jugar los cinco modos de desafíos diarios, con un controlador que recorre desafíos y días automáticamente.
+Así que hice uno en Python. Lee la pantalla, calcula qué casillas pulsar y juega los cinco tipos de desafío. También puede recorrer el menú de desafíos diarios, completar un día y pasar al siguiente por su cuenta.
 
-Desarrollado con **IA como asistente de programación**. El razonamiento utiliza reglas conocidas del Buscaminas, restricciones y probabilidades; no requiere una red neuronal.
+Usé **IA como asistente de programación** durante el desarrollo. El bot utiliza reglas del Buscaminas, resolución de restricciones y cálculos de probabilidades.
 
 ## Gameplay
 
+Aquí están las grabaciones del bot jugando cada modo. No incluí el recorrido completo de los desafíos diarios porque el GIF sería demasiado largo.
+
 ### Clásico
 
-Abre casillas seguras, coloca banderas en minas confirmadas y apuesta por una casilla de bajo riesgo cuando se agotan las deducciones.
+Abre casillas seguras y marca minas. Cuando no quedan movimientos ciertos, elige una apuesta de bajo riesgo.
 
-> **GIF pendiente:** `Media/classic.gif`
-
-<!-- Sustituye la línea anterior por este bloque cuando esté disponible:
 <div align="center">
-<img src="Media/classic.gif" alt="Bot resolviendo una partida clásica de Buscaminas" width="900">
+<img src="Media/classic.gif" alt="Clásico gameplay" width="900">
 </div>
--->
 
-### Desafíos diarios
+### Banderas
 
-Cinco modos, cada uno con su objetivo y sus acciones permitidas:
+Solo coloca banderas. Guarda las casillas seguras deducidas en memoria, pero no las abre.
 
-| Modo | Qué hace el bot | Espacio para GIF |
-| --- | --- | --- |
-| **Banderas** | Coloca solo banderas deducidas, hasta alcanzar el objetivo. | `Media/flags.gif` |
-| **Detonación** | Pulsa minas confirmadas; si no las hay, elige la mayor probabilidad estimada de mina. | `Media/detonation.gif` |
-| **Clásico** | Abre casillas seguras y marca minas. | `Media/classic.gif` |
-| **Búsqueda del tesoro** | Busca el cofre; considera anillos de minas solo cuando no hay aperturas seguras, según las vidas restantes. | `Media/treasure.gif` |
-| **Pulsaciones** | Realiza aperturas seguras sin poner banderas; cuenta solo clics que abrieron casillas. | `Media/taps.gif` |
-
-> **GIF del recorrido automático pendiente:** `Media/daily-challenges.gif`
-
-<!-- Descomenta cuando esté disponible:
 <div align="center">
-<img src="Media/daily-challenges.gif" alt="Bot completando desafíos y avanzando al siguiente día" width="900">
+<img src="Media/flags.gif" alt="Banderas gameplay" width="900">
 </div>
--->
 
-En [Media/README.md](Media/README.md) están los bloques preparados para los demás GIFs.
+### Detonación
 
----
+Aquí toca pulsar minas antes de gastar los movimientos disponibles. Detonar una puede provocar aperturas en cadena y dar más pistas al solver.
 
-## Características principales
+<div align="center">
+<img src="Media/detonation.gif" alt="Detonación gameplay" width="900">
+</div>
 
-* **Lectura de pantalla:** OpenCV detecta la cuadrícula y los estados. Las plantillas reconocen números rápidamente y Tesseract sirve como alternativa.
-* **Deducción lógica:** Reglas de vecindad, resta de subconjuntos y restricciones binarias para encontrar certezas.
-* **Probabilidades exactas:** Agrupa casillas equivalentes, memoriza estados y pondera soluciones según el total de minas.
-* **Apuestas aproximadas:** Si el cálculo exacto supera su presupuesto, utiliza configuraciones compatibles para elegir una apuesta. Estas estimaciones nunca se convierten en certezas.
-* **Cinco modos de juego:** Objetivos, contadores y restricciones de clic separados.
-* **Navegación diaria:** Abre tarjetas pendientes de izquierda a derecha, atiende instrucciones y anuncios de vídeo, confirma victorias y reintenta derrotas confirmadas.
-* **Verificación y recuperación:** Comprueba acciones con capturas nuevas, espera resultados tardíos y reintenta una vez las acciones confirmadas que faltan.
-* **Diagnósticos:** Guarda capturas, lecturas, planes, probabilidades, eventos de navegación y tiempos.
+### Búsqueda del tesoro
 
-## Cómo funciona
+Busca el cofre rodeado de minas. Si se acaban las aperturas seguras, considera los anillos de minas y las vidas restantes para elegir una apuesta.
 
-```text
-Captura → Cuadrícula → Reconocimiento de casillas → Deducción
-                                                      ↓
-                                   Búsqueda de certezas / probabilidades
-                                                      ↓
-                                      Clics → Verificación
-```
+<div align="center">
+<img src="Media/treasure.gif" alt="Búsqueda del tesoro gameplay" width="900">
+</div>
 
-Cada número impone una restricción sobre sus vecinos. Si `{A, B}` contiene una mina y `{A, B, C}` también contiene una mina, `C` es segura. Cuando esas reglas no avanzan, el solver intenta demostrar certezas comprobando si la hipótesis contraria es imposible.
+### Pulsaciones
 
-El cálculo exacto cuenta distribuciones compatibles con las pistas y el total inicial. La alternativa aproximada obtiene distribuciones válidas mediante objetivos aleatorios de optimización. **El muestreo no es uniforme:** sus frecuencias son una heurística para apostar, no probabilidades calibradas ni pruebas de seguridad.
+Abre casillas seguras sin colocar banderas. Las casillas que se abren por expansión no cuentan como clics adicionales para el objetivo.
 
-Ejecuta los movimientos conocidos por lotes y reutiliza lecturas de casillas sin cambios. Espera a que terminen animaciones y avisos de logros antes de analizar el siguiente tablero.
+<div align="center">
+<img src="Media/taps.gif" alt="Pulsaciones gameplay" width="900">
+</div>
+
+## Cómo funciona el solver
+
+El lector encuentra la cuadrícula con OpenCV y clasifica cada casilla. Empecé con colores, pero no bastaba para distinguir todos los números, así que añadí plantillas de números y Tesseract OCR como alternativa. Las casillas que no han cambiado se reutilizan en lugar de leerlas otra vez en cada ronda.
+
+La primera capa aplica la lógica habitual del Buscaminas. Si un número ya tiene todas sus minas identificadas, los demás vecinos son seguros. Si todas las casillas desconocidas tienen que ser minas, las marca. También compara grupos: si `{A, B}` contiene una mina y `{A, B, C}` contiene una mina, entonces `C` es segura.
+
+En posiciones más difíciles utiliza restricciones binarias para comprobar si una casilla puede ser segura o una mina. Si aún necesita apostar, cuenta las distribuciones compatibles, agrupando casillas equivalentes y guardando resultados intermedios para no repetir cálculos.
+
+Si el cálculo exacto tarda demasiado, intenta un muestreo breve de distribuciones compatibles. Las muestras no son uniformes, así que esas estimaciones sirven solo para elegir una apuesta. Nunca se convierten en banderas confirmadas ni aperturas seguras.
+
+La parte práctica también dio trabajo: esperar animaciones, reconocer el final de partida, saltarse casillas abiertas por expansión y comprobar que el juego registró los clics. Ejecuta los movimientos conocidos por lotes y verifica el resultado con capturas nuevas antes de seguir.
 
 ## Instalación
 
@@ -126,16 +117,16 @@ Mantén el juego en primer plano y la posición de la ventana sin cambios. Mueve
 | `*_recovery.py`, `delayed_guess.py` | Recuperación y verificación tardía |
 | `tests/`, `assets/` | Pruebas, casos de referencia y plantillas |
 
-## Validación y limitaciones
+## Pruebas y algunas notas prácticas
 
-La suite tiene **203 pruebas** de deducción, probabilidades, reconocimiento, modos, recuperación y navegación con entradas simuladas. Puedes ejecutarlas con:
+Hay **203 pruebas** del solver, la lectura de pantalla, los modos y la navegación. Las pruebas de interacción usan entradas simuladas, así que ejecutarlas no mueve el ratón:
 
 ```powershell
 python -m unittest discover -s tests -v
 ```
 
-El bot se ha probado en los cinco modos y con varios tamaños, incluidos 9×9, 16×16 y 30×16. Todavía no se ha validado un mes completo sin interrupciones. Otros temas, escalados de pantalla y elementos que tapen el tablero pueden requerir ajustes.
+Lo probé en los cinco modos y con varios tamaños, incluidos 9×9, 16×16 y 30×16. El reconocimiento depende del aspecto del juego, así que otro tema o escalado de pantalla puede necesitar ajustes.
 
-Las apuestas pueden perder partidas y las estimaciones aproximadas tienen sesgo. El controlador reintenta derrotas confirmadas; lecturas dudosas y fallos del solver o de verificación lo detienen para revisar. En las pruebas reales, una pausa de `0.1` segundos entre clics ha resultado más fiable que cero.
+A veces pierde una apuesta. El controlador reintenta las derrotas confirmadas y para si no puede confiar en una lectura o verificar una acción. Uso una pausa de `0.1` segundos entre clics: con cero iba más rápido, pero el juego se saltaba algunos.
 
-Las notas técnicas y mediciones anteriores están en [docs/development-notes.md](docs/development-notes.md). Conservan el historial del proyecto y pueden describir comportamientos de versiones anteriores.
+Dejé las notas de implementación y las mediciones en [docs/development-notes.md](docs/development-notes.md). Es un registro del desarrollo, así que algunas entradas describen versiones anteriores.

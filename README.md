@@ -2,76 +2,67 @@
 
 > *Read this in [Spanish](README_es.md)*
 
-A Python bot that plays **Microsoft Minesweeper on Windows** by reading the screen, reasoning about the board and controlling the mouse.
+This started during a power cut. With no Wi-Fi, I ended up playing Microsoft Minesweeper and discovered the daily challenges. After a few games, I thought: why do all of these by hand when a bot could solve them?
 
-I started this project to combine Minesweeper logic with computer vision. It grew from a solver for manually entered boards into a player for all five daily challenge modes, with an automatic controller that moves between challenges and days.
+So I built one in Python. It reads the screen, works out which cells to click and plays through the five challenge types. It can also go through the daily challenge menu on its own, completing a day and moving on to the next.
 
-Developed with **AI as a programming assistant**. The reasoning uses known Minesweeper rules, constraint solving and probability calculations; no neural network is required.
+I used **AI as a programming assistant** while building it. The bot itself uses Minesweeper rules, constraint solving and probability calculations.
 
 ## Gameplay
 
+These are recordings of the bot playing each mode. I left out the full daily run because it would make for a very long GIF.
+
 ### Classic
 
-Reveals safe cells, flags confirmed mines and chooses a low-risk guess when deduction is exhausted.
+Opens safe cells and flags mines. When there is no certain move left, it chooses a low-risk guess.
 
-> **GIF coming soon:** `Media/classic.gif`
-
-<!-- Replace the line above with this block when the GIF is available:
 <div align="center">
-<img src="Media/classic.gif" alt="Bot solving a classic Minesweeper board" width="900">
+<img src="Media/classic.gif" alt="Classic gameplay" width="900">
 </div>
--->
 
-### Daily Challenges
+### Flags
 
-Five modes, each with its own objective and allowed actions:
+Only places flags. It keeps deduced safe cells in memory, but never opens them.
 
-| Mode | What the bot does | GIF slot |
-| --- | --- | --- |
-| **Flags** | Places only deduced flags, up to the target. | `Media/flags.gif` |
-| **Detonation** | Clicks confirmed mines; otherwise chooses the highest estimated mine probability. | `Media/detonation.gif` |
-| **Classic** | Opens safe cells and flags mines. | `Media/classic.gif` |
-| **Treasure Hunt** | Searches for treasure; considers mine rings only when no safe opening exists, using the remaining lives. | `Media/treasure.gif` |
-| **Taps** | Makes safe openings without placing flags; counts only successful clicks. | `Media/taps.gif` |
-
-> **Automatic daily run GIF coming soon:** `Media/daily-challenges.gif`
-
-<!-- Uncomment when available:
 <div align="center">
-<img src="Media/daily-challenges.gif" alt="Bot completing challenges and moving to the next day" width="900">
+<img src="Media/flags.gif" alt="Flags gameplay" width="900">
 </div>
--->
 
-See [Media/README.md](Media/README.md) for the other ready-to-use GIF blocks.
+### Detonation
 
----
+The goal is to click mines within the move budget. Revealing a mine can trigger a chain of safe openings, giving the solver more clues.
 
-## Main Features
+<div align="center">
+<img src="Media/detonation.gif" alt="Detonation gameplay" width="900">
+</div>
 
-* **Screen Reading:** OpenCV detects the grid and cell states. Number templates provide fast recognition, with Tesseract OCR as a fallback.
-* **Logical Deduction:** Neighbor rules, subset subtraction and binary constraint solving identify certain moves.
-* **Exact Probabilities:** Equivalent cells are grouped, intermediate states are cached and solutions are weighted by the total mine count.
-* **Approximate Guesses:** When exact counting exceeds its budget, compatible configurations provide a bounded heuristic for guessing. These estimates never become certain moves.
-* **Five Game Modes:** Separate objectives, counters and click restrictions for daily challenges.
-* **Daily Navigation:** Opens unfinished cards from left to right, handles instructions and video ads, confirms wins and retries confirmed losses.
-* **Verification and Recovery:** Checks actions against new captures, waits for delayed results and retries missing confirmed actions once.
-* **Diagnostics:** Saves screenshots, readings, plans, probabilities, navigation events and timing measurements.
+### Treasure Hunt
 
-## How It Works
+Looks for the chest surrounded by mines. If safe openings run out, it considers mine rings and the remaining lives before choosing a guess.
 
-```text
-Screenshot → Grid detection → Cell recognition → Deduction
-                                                    ↓
-                                  Certainty search / probabilities
-                                                    ↓
-                                     Mouse actions → Verification
-```
+<div align="center">
+<img src="Media/treasure.gif" alt="Treasure Hunt gameplay" width="900">
+</div>
 
-Each number constrains its neighboring cells. For example, if `{A, B}` contains one mine and `{A, B, C}` also contains one mine, then `C` is safe. When these rules stop making progress, the solver tries to prove certainty by checking whether the opposite assumption is impossible.
+### Taps
 
-Exact probabilities count compatible mine arrangements, including the initial total. The approximate fallback samples feasible arrangements through random optimization objectives. **This sampling is not uniform:** its frequencies are a guessing heuristic, not calibrated probabilities or proofs.
+Opens safe cells without placing flags. Cells opened by a cascade do not count as extra clicks toward the target.
 
-The bot executes known moves in batches and reuses unchanged cell readings. It waits for animations and achievement overlays before analyzing the next board.
+<div align="center">
+<img src="Media/taps.gif" alt="Taps gameplay" width="900">
+</div>
+
+## How the solver works
+
+The screen reader finds the grid with OpenCV, then classifies each cell. I started with colors, but that was not enough to distinguish all the numbers, so I added number templates and Tesseract OCR as a fallback. Unchanged cells are reused rather than read again every round.
+
+The first layer of reasoning is the usual Minesweeper logic. If a number already has all its mines accounted for, the other neighbors are safe. If every unknown neighbor must be a mine, they all get marked. The solver also compares groups: if `{A, B}` contains one mine and `{A, B, C}` contains one mine, then `C` is safe.
+
+For harder positions, it uses binary constraints to test whether a cell can possibly be safe or a mine. When it still needs to guess, it counts compatible mine arrangements, grouping equivalent cells and caching intermediate results to keep the calculation manageable.
+
+If exact counting takes too long, it tries a short sampling pass over compatible arrangements. The samples are not uniform, so these estimates are only used to choose a guess. They never turn into confirmed flags or safe openings.
+
+The practical part took plenty of work too: waiting for animations, recognizing the end of a game, skipping cells already opened by a cascade and checking whether the game actually registered a click. Known moves run in batches; new screenshots verify the result before the next batch.
 
 ## Installation
 
@@ -126,16 +117,16 @@ Keep the game in the foreground and the window position unchanged. Move the mous
 | `*_recovery.py`, `delayed_guess.py` | Action recovery and delayed verification |
 | `tests/`, `assets/` | Tests, fixtures and recognition templates |
 
-## Validation and Limitations
+## Tests and a few practical notes
 
-The automated suite has **203 tests** covering deduction, probability counting, recognition, mode rules, recovery and navigation with simulated input. Run it with:
+There are **203 tests** for the solver, screen reader, game modes and navigation. The interaction tests use simulated input, so running them will not move your mouse:
 
 ```powershell
 python -m unittest discover -s tests -v
 ```
 
-The bot has been exercised on all five modes and several board sizes, including 9×9, 16×16 and 30×16. A complete uninterrupted monthly run has not yet been validated. Other themes, display scaling and occlusions can require recognition adjustments.
+I tested it on all five modes and several board sizes, including 9×9, 16×16 and 30×16. Recognition depends on the game’s appearance, so a different theme or display scale may need adjustments.
 
-Guesses can lose games, and approximate estimates are biased. Confirmed losses can be retried by the daily controller; uncertain readings and solver/verification failures stop it for inspection. A click delay of `0.1` seconds has been more reliable than zero in real tests.
+It still loses guesses sometimes. The daily controller retries confirmed defeats and stops when it cannot trust a reading or verify an action. I use a `0.1` second click delay: setting it to zero was faster, but the game missed some clicks.
 
-Detailed implementation notes and previous measurements are in [docs/development-notes.md](docs/development-notes.md). They record the project's development history and may describe earlier behavior.
+I kept the implementation notes and measurements in [docs/development-notes.md](docs/development-notes.md). They are a development log, so some entries describe older versions.
