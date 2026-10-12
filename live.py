@@ -27,6 +27,7 @@ from flags_mode import read_flag_target, read_open_target, read_moves_left, appl
 from solver import deduce
 from detonation import plan_detonations, choose_detonation, newly_revealed_mines
 from flag_recovery import recover_flags
+from open_recovery import recover_opens
 from approximate_probability import estimate_probabilities
 
 
@@ -376,6 +377,26 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
                 'outcome':outcome,'reading':updated},indent=2),encoding='utf-8')
             print(f'Recuperación: {len(retried)} banderas reintentadas.')
             if outcome:return finish(output,outcome,turn)
+        if mode not in ('flags','detonate'):
+            def prove_open_safe(fresh_reading,r,c):
+                board=fresh_reading['board']
+                unexpected_mine=any(value=='m' and reading['board'][rr][cc]!='m'
+                    for rr,row in enumerate(board) for cc,value in enumerate(row))
+                if mode=='opens' and not unexpected_mine:board=apply_knowledge(board,knowledge)
+                deductions=timings.measure('deduction',lambda:deduce(board,total_mines))
+                if deductions[r][c]=='o':return True
+                proofs=timings.measure('certainty',lambda:find_certainties(deductions,total_mines))
+                return proofs.get((r,c))==0
+            open_state,open_retried=recover_opens(executed,updated,refresh_flags,prove_open_safe,
+                capture,lambda action:timings.measure('click',lambda:click(action)),check_window,grid)
+            retried+=open_retried
+            if open_state is not None:
+                after,updated,outcome=open_state
+                cv2.imwrite(str(folder/'after.png'),after)
+                (folder/'open-recovery.json').write_text(json.dumps({'retried_actions':open_retried,
+                    'outcome':outcome,'reading':updated},indent=2),encoding='utf-8')
+                print(f'Recuperación: {len(open_retried)} aperturas seguras reintentadas.')
+                if outcome:return finish(output,outcome,turn)
         if mode in ('treasure','opens') and any(value=='m' and reading['board'][r][c]!='m'
                                     for r,row in enumerate(updated['board']) for c,value in enumerate(row)):
             lives=get_lives(after)
