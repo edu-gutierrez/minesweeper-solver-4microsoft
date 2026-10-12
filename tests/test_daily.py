@@ -58,6 +58,40 @@ class FakeDaily:
 
 
 class DailyTests(unittest.TestCase):
+    def test_previous_panel_can_linger_after_card_click_without_duplicate_click(self):
+        class DelayedPanel(FakeDaily):
+            pending=0
+            def click(self,action):
+                super().click(action)
+                if action['y']==300:self.pending=3
+            def classify(self,image):
+                if self.pending:
+                    self.pending-=1
+                    kind=self.kind;self.kind='panel'
+                    scene=super().classify(image);self.kind=kind
+                    return scene
+                return super().classify(image)
+        fake=DelayedPanel()
+        with tempfile.TemporaryDirectory() as folder:
+            result=run_daily(fake.capture,fake.click,lambda:None,Path(folder),execute=True,
+                classifier=fake.classify,player=fake.player,clock=lambda:fake.ticks,
+                sleep=fake.sleep,max_days=1)
+        self.assertEqual(result['reason'],'day_limit')
+        self.assertEqual(sum(y==300 for x,y in fake.clicks),5)
+
+    def test_panel_that_never_leaves_stops_without_reclick(self):
+        class StuckPanel(FakeDaily):
+            def click(self,action):
+                self.clicks.append((action['x'],action['y']))
+        fake=StuckPanel()
+        with tempfile.TemporaryDirectory() as folder:
+            result=run_daily(fake.capture,fake.click,lambda:None,Path(folder),execute=True,
+                classifier=fake.classify,player=fake.player,clock=lambda:fake.ticks,
+                sleep=fake.sleep,max_days=1)
+        self.assertEqual(result['reason'],'error')
+        self.assertEqual(len(fake.clicks),1)
+        self.assertEqual(fake.calls,0)
+
     def test_post_ad_board_flash_does_not_start_solver_before_jugar(self):
         class DelayedBriefing(FakeDaily):
             def __init__(self):

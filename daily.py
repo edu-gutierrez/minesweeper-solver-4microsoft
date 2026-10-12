@@ -66,6 +66,7 @@ def run_daily(capture,click,check_window,output,execute=False,guess=True,max_rou
         closed=False
         briefing=False
         board_since=None
+        panel_since=None
         while clock()-start<150:
             scene=snapshot()
             kind=scene['kind']
@@ -79,6 +80,15 @@ def run_daily(capture,click,check_window,output,execute=False,guess=True,max_rou
                 sleep(.5)
                 continue
             board_since=None
+            if kind=='panel':
+                # El clic puede estar registrado aunque aún se vea la pantalla
+                # anterior durante la transición. No repetirlo.
+                if panel_since is None:panel_since=clock()
+                if clock()-panel_since>=10:
+                    raise RuntimeError('El panel de desafíos no desapareció tras abrir la tarjeta.')
+                sleep(.5)
+                continue
+            panel_since=None
             if kind=='ad':
                 if scene.get('close') and not closed:
                     act(scene['close'],'cerrar anuncio de vídeo')
@@ -88,7 +98,7 @@ def run_daily(capture,click,check_window,output,execute=False,guess=True,max_rou
                 act(scene['buttons']['jugar'],'jugar desafío')
                 briefing=True
                 closed=False
-            elif kind in ('panel','win','loss_offer','defeat'):
+            elif kind in ('win','loss_offer','defeat'):
                 raise RuntimeError(f'Pantalla inesperada al abrir el desafío: {kind}.')
             sleep(.5)
         raise RuntimeError('El anuncio o la carga no terminó dentro del límite de espera.')
