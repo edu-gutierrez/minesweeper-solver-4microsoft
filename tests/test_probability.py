@@ -1,5 +1,7 @@
 from fractions import Fraction
 from itertools import combinations
+from itertools import product
+from collections import Counter
 import json
 from pathlib import Path
 import random
@@ -10,11 +12,56 @@ from unittest.mock import patch
 import numpy as np
 
 from live import play
-from probability import mine_probabilities, ProbabilityLimit
+from probability import mine_probabilities, ProbabilityLimit, component_counts
 from solver import neighbors
 
 
 class ProbabilityTests(unittest.TestCase):
+    def test_grouped_counts_and_each_cell_match_exhaustive_assignments(self):
+        rng=random.Random(519)
+        for _ in range(50):
+            n=rng.randrange(5,11)
+            positions=[(0,i) for i in range(n)]
+            truth=[rng.randrange(2) for _ in positions]
+            groups=[]
+            for _ in range(rng.randrange(1,6)):
+                cells=frozenset(rng.sample(positions,rng.randrange(1,n+1)))
+                groups.append((cells,sum(truth[p[1]] for p in cells)))
+            component=set().union(*(cells for cells,_ in groups))
+            ordered=sorted(component)
+            remaining=rng.randrange(n+1)
+            expected=Counter(); cell_expected={pos:Counter() for pos in component}
+            for values in product((0,1),repeat=len(ordered)):
+                assignment=dict(zip(ordered,values)); total=sum(values)
+                if total>remaining or any(sum(assignment[p] for p in cells)!=mines for cells,mines in groups):
+                    continue
+                expected[total]+=1
+                for pos,value in assignment.items():
+                    if value: cell_expected[pos][total]+=1
+            counts,cell_counts=component_counts(component,groups,remaining,lambda _:None)
+            self.assertEqual(counts,expected)
+            self.assertEqual(cell_counts,cell_expected)
+
+    def test_equivalent_cells_keep_binomial_weights(self):
+        component={(0,i) for i in range(5)}
+        counts,memberships=component_counts(component,[(frozenset(component),2)],5,lambda _:None)
+        self.assertEqual(counts,Counter({2:10}))
+        self.assertTrue(all(value==Counter({2:4}) for value in memberships.values()))
+
+    def test_stalled_detonation_board_finishes_with_original_limits(self):
+        board=json.loads((Path(__file__).parent/'fixtures/detonation-probability-stalled.json').read_text())
+        risks=mine_probabilities(board,93)
+        self.assertEqual(len(risks),402)
+        self.assertEqual(sum(risks.values()),93)
+        highest=max(risks.values())
+        self.assertEqual({p for p,risk in risks.items() if risk==highest},{(3,25),(3,26)})
+        self.assertGreater(highest,Fraction(98,100))
+        self.assertLess(highest,1)
+
+    def test_timeout_does_not_return_cached_partial_results(self):
+        with self.assertRaises(ProbabilityLimit):
+            mine_probabilities([['?',1,'?']],1,timeout=0)
+
     def test_true_fifty_fifty(self):
         self.assertEqual(mine_probabilities([['?',1,'?']],1),
                          {(0,0):Fraction(1,2),(0,2):Fraction(1,2)})

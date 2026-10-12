@@ -2,6 +2,7 @@
 
 from collections import Counter
 from fractions import Fraction
+from functools import lru_cache
 from math import comb
 import time
 
@@ -20,8 +21,108 @@ def convolve(left, right):
     return result
 
 
+def component_counts(component,groups,remaining,check_budget):
+    """Cuenta grupos equivalentes y reutiliza las restricciones pendientes.
+
+    Una selección de k minas entre n casillas tiene peso comb(n,k). Para la
+    cuenta de una casilla concreta se usa comb(n-1,k-1), no k ni peso uniforme.
+    """
+    equivalent = {}
+    for pos in sorted(component):
+        signature=tuple(i for i,(cells,_) in enumerate(groups) if pos in cells)
+        equivalent.setdefault(signature,[]).append(pos)
+    # Mantener pocas pistas abiertas reduce el tamaño del estado memorizado.
+    pending=list(equivalent)
+    active=set()
+    buckets_left=[sum(i in key for key in pending) for i in range(len(groups))]
+    ordered=[]
+    while pending:
+        def score(key):
+            closes={i for i in key if buckets_left[i]==1}
+            after=(active|set(key))-closes
+            return len(after),len(set(key)-active),-len(closes),-len(set(key)&active),key
+        key=min(pending,key=score)
+        pending.remove(key)
+        ordered.append((key,equivalent[key]))
+        active.update(key)
+        for i in key:
+            buckets_left[i]-=1
+            if buckets_left[i]==0:
+                active.discard(i)
+    n=len(ordered)
+    suffix_available=[None]*(n+1)
+    suffix_available[n]=(0,)*len(groups)
+    for index in range(n-1,-1,-1):
+        available=list(suffix_available[index+1])
+        key,cells=ordered[index]
+        for i in key:
+            available[i]+=len(cells)
+        suffix_available[index]=tuple(available)
+    initial=tuple(mines for _,mines in groups)
+
+    def choices(index,needed):
+        key,cells=ordered[index]
+        low=max(0,max(needed[i]-suffix_available[index+1][i] for i in key))
+        high=min(len(cells),min(needed[i] for i in key),remaining)
+        for k in range(low,high+1):
+            child=list(needed)
+            for i in key:
+                child[i]-=k
+            yield k,tuple(child)
+
+    @lru_cache(maxsize=None)
+    def solve(index,needed):
+        check_budget(True)
+        if any(value<0 or value>available
+               for value,available in zip(needed,suffix_available[index])):
+            return ()
+        if index==n:
+            return ((0,1),)
+        counts=Counter()
+        size=len(ordered[index][1])
+        for k,child in choices(index,needed):
+            weight=comb(size,k)
+            for mines,ways in solve(index+1,child):
+                if mines+k<=remaining:
+                    counts[mines+k]+=weight*ways
+        return tuple(sorted(counts.items()))
+
+    counts=Counter(dict(solve(0,initial)))
+    # El paso hacia delante agrupa también prefijos que llegaron al mismo estado.
+    # El sufijo memorizado da las maneras de completar cada elección del grupo.
+    prefixes={initial:Counter({0:1})}
+    cell_counts={}
+    for index,(key,cells) in enumerate(ordered):
+        next_prefixes={}
+        mine_counts=Counter()
+        size=len(cells)
+        for needed,prefix_counts in prefixes.items():
+            check_budget(False)
+            for k,child in choices(index,needed):
+                suffix=solve(index+1,child)
+                if not suffix:
+                    continue
+                weight=comb(size,k)
+                mine_weight=comb(size-1,k-1) if k else 0
+                next_counts=next_prefixes.setdefault(child,Counter())
+                for prefix_mines,prefix_ways in prefix_counts.items():
+                    if prefix_mines+k>remaining:
+                        continue
+                    next_counts[prefix_mines+k]+=prefix_ways*weight
+                    if mine_weight:
+                        for suffix_mines,suffix_ways in suffix:
+                            total=prefix_mines+k+suffix_mines
+                            if total<=remaining:
+                                mine_counts[total]+=prefix_ways*mine_weight*suffix_ways
+        for pos in cells:
+            cell_counts[pos]=mine_counts
+        prefixes=next_prefixes
+    solve.cache_clear()
+    return counts,cell_counts
+
+
 def mine_probabilities(board, total_mines, max_nodes=250_000, timeout=2.0):
-    """Enumera componentes independientes y pondera las casillas sin pistas.
+    """Cuenta componentes con estados compartidos y pondera casillas sin pistas.
 
     Todas las colocaciones compatibles con el total tienen el mismo peso.
     Los resultados son fracciones exactas, incluidas las certezas 0 y 1.
@@ -73,47 +174,22 @@ def mine_probabilities(board, total_mines, max_nodes=250_000, timeout=2.0):
 
     deadline = time.perf_counter()+timeout
     nodes = 0
+
+    def check_budget(new_state=False):
+        nonlocal nodes
+        if new_state:
+            nodes+=1
+        if nodes>max_nodes or time.perf_counter()>deadline:
+            raise ProbabilityLimit('El cálculo exacto excede el límite; no se apuesta.')
     distributions = []
     memberships = []
     for component in components:
+        check_budget()
         groups = [(cells,mines) for cells,mines in constraints.items() if cells <= component]
-        ordered = sorted(component,key=lambda p:(-sum(p in cells for cells,_ in groups),p))
-        indexes = [[i for i,(cells,_) in enumerate(groups) if pos in cells] for pos in ordered]
-        needed = [mines for _,mines in groups]
-        available = [len(cells) for cells,_ in groups]
-        assigned = [0]*len(ordered)
-        counts = Counter()
-        cell_counts = {pos:Counter() for pos in ordered}
-
-        def visit(index, mines):
-            nonlocal nodes
-            nodes += 1
-            if nodes > max_nodes or time.perf_counter() > deadline:
-                raise ProbabilityLimit('El cálculo exacto excede el límite; no se apuesta.')
-            if mines > remaining:
-                return
-            if index == len(ordered):
-                counts[mines] += 1
-                for pos,value in zip(ordered,assigned):
-                    if value:
-                        cell_counts[pos][mines] += 1
-                return
-            for value in (0,1):
-                affected = indexes[index]
-                for i in affected:
-                    needed[i] -= value
-                    available[i] -= 1
-                if all(0 <= needed[i] <= available[i] for i in affected):
-                    assigned[index] = value
-                    visit(index+1,mines+value)
-                for i in affected:
-                    needed[i] += value
-                    available[i] += 1
-
         # Evita alcanzar el límite de recursión en fronteras enormes.
-        if len(ordered) > 100:
+        if len(component) > 100:
             raise ProbabilityLimit('Frontera demasiado grande para el cálculo exacto.')
-        visit(0,0)
+        counts,cell_counts=component_counts(component,groups,remaining,check_budget)
         if not counts:
             raise ValueError('No hay distribuciones de minas compatibles.')
         distributions.append(counts)
@@ -121,6 +197,7 @@ def mine_probabilities(board, total_mines, max_nodes=250_000, timeout=2.0):
 
     combined = Counter({0:1})
     for counts in distributions:
+        check_budget()
         combined = convolve(combined,counts)
     free_count = len(free)
 
@@ -132,6 +209,7 @@ def mine_probabilities(board, total_mines, max_nodes=250_000, timeout=2.0):
         raise ValueError('El total descarta todas las distribuciones de minas.')
     probabilities = {}
     for index,cell_counts in enumerate(memberships):
+        check_budget()
         others = Counter({0:1})
         for j,counts in enumerate(distributions):
             if j != index:
@@ -146,4 +224,5 @@ def mine_probabilities(board, total_mines, max_nodes=250_000, timeout=2.0):
                         for mines,ways in combined.items() if 1 <= remaining-mines <= free_count)
         for pos in free:
             probabilities[pos] = Fraction(numerator,total_ways)
+    check_budget()
     return probabilities
