@@ -129,4 +129,4 @@ I tested it on all five modes and several board sizes, including 9×9, 16×16 an
 
 It still loses guesses sometimes. The daily controller retries confirmed defeats and stops when it cannot trust a reading or verify an action. I use a `0.1` second click delay: setting it to zero was faster, but the game missed some clicks.
 
-I kept the implementation notes and measurements in [docs/development-notes.md](docs/development-notes.md). They are a development log, so some entries describe older versions.
+The [development notes](docs/development-notes.md) explain how the solver, screen reader and game controller evolved, and the decisions behind them.

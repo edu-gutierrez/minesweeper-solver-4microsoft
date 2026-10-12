@@ -1,3 +1,21 @@
 __pycache__/
 *.py[cod]
 .venv/
+
+# Local learning notes
+/.vibe-wise/
+
+# Generated game sessions, when saved inside this repository
+/live-test/
+/live-game/
+/daily-run/
+
+# Default outputs from the screenshot tools
+/grid-preview.png
+/grid-preview.json
+/ocr-preview.png
+/ocr-preview.json
+/analysis.png
+/analysis.json
+/analysis-readings.png
+/analysis-corrections/

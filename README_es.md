@@ -129,4 +129,4 @@ Lo probé en los cinco modos y con varios tamaños, incluidos 9×9, 16×16 y 30�
 
 A veces pierde una apuesta. El controlador reintenta las derrotas confirmadas y para si no puede confiar en una lectura o verificar una acción. Uso una pausa de `0.1` segundos entre clics: con cero iba más rápido, pero el juego se saltaba algunos.
 
-Dejé las notas de implementación y las mediciones en [docs/development-notes.md](docs/development-notes.md). Es un registro del desarrollo, así que algunas entradas describen versiones anteriores.
+Las [notas de desarrollo](docs/development-notes.md) explican cómo evolucionaron el solver, el lector de pantalla y el controlador, y las decisiones que tomé.
