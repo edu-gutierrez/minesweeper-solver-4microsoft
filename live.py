@@ -26,6 +26,7 @@ from treasure import read_mode, read_lives, choose_guess
 from flags_mode import read_flag_target, read_open_target, read_moves_left, apply_knowledge, flag_plan, open_plan, successful_opens, retry_target
 from solver import deduce
 from detonation import plan_detonations, choose_detonation, newly_revealed_mines
+from flag_recovery import recover_flags
 
 
 def window_rect(user32, hwnd):
@@ -342,6 +343,29 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
         if updated.get('manual_corrections'):
             print('Corrección recibida. Devuelve el foco a Minesweeper en 5 segundos.')
             time.sleep(5)
+        def refresh_flags():
+            check_window()
+            fresh=timings.measure('stability',lambda:wait_stable(capture,grid,tracker=face_tracker))
+            cv2.imwrite(str(folder/'flag-recovery.png'),fresh)
+            result=timings.measure('outcome',lambda:detect_outcome(fresh,face_tracker))
+            if result:return fresh,None,result
+            fresh_grid=keep_grid_geometry(grid,timings.measure('grid',lambda:detect_grid(fresh)),after,fresh)
+            fresh_reading=timings.measure('reading',lambda:read_board(
+                fresh,fresh_grid,previous_image=after,previous_grid=after_grid,previous_reading=updated))
+            correct_cells(fresh,fresh_grid,fresh_reading,folder/'flag-recovery-corrections')
+            if fresh_reading.get('manual_corrections'):
+                print('Corrección recibida. Devuelve el foco a Minesweeper en 5 segundos.')
+                time.sleep(5)
+            return fresh,fresh_reading,None
+        recovered,retried=recover_flags(plan,updated,refresh_flags,capture,
+            lambda action:timings.measure('click',lambda:click(action)),check_window,grid)
+        if recovered is not None:
+            after,updated,outcome=recovered
+            cv2.imwrite(str(folder/'after.png'),after)
+            (folder/'flag-recovery.json').write_text(json.dumps({'retried_actions':retried,
+                'outcome':outcome,'reading':updated},indent=2),encoding='utf-8')
+            print(f'Recuperación: {len(retried)} banderas reintentadas.')
+            if outcome:return finish(output,outcome,turn)
         if mode in ('treasure','opens') and any(value=='m' and reading['board'][r][c]!='m'
                                     for r,row in enumerate(updated['board']) for c,value in enumerate(row)):
             lives=get_lives(after)
@@ -367,6 +391,7 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
             if not valid:
                 failures.append(action)
         (folder/'verification.json').write_text(json.dumps({'reading':updated,'failed_actions':failures,
+                                                           'retried_actions':retried,
                                                            'executed_actions':executed},indent=2),encoding='utf-8')
         if failures:
             raise RuntimeError('No se verificaron todas las acciones; no se repetirán automáticamente.')
