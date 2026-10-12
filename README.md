@@ -364,7 +364,7 @@ En el tablero de Detonación que agotaba el cálculo, las componentes mayores ti
 Desde el panel de desafíos, ejecuta:
 
 ```powershell
-python daily.py --execute --click-delay 0.1 --output "..\daily-run"
+python complete_challenges.py --execute --click-delay 0.1 --output "..\daily-run"
 ```
 
 Las apuestas del jugador están habilitadas para clásico, tesoro y detonación; Banderas y Pulsaciones conservan sus restricciones sin apuestas. `--no-guess` detiene las partidas que necesiten apostar. Sin `--execute`, el comando inspecciona el panel y guarda un resumen sin hacer clics. `--max-days 1` permite limitar una prueba a un día completo, y `--max-rounds` limita cada partida.
@@ -378,3 +378,4 @@ Solo avanza de día tras comprobar las cinco medallas. Pulsa la flecha derecha, 
 Cada ejecución crea una carpeta `session-...Z` en la salida: `events.json` registra navegación, `result.json` el motivo final y `stopped.png` la última captura ante errores. Las partidas quedan separadas por día, tarjeta e intento, con los diagnósticos habituales del jugador. Las comprobaciones de foco, posición de ventana y fail-safe siguen activas. Las apuestas pueden perder; las victorias se confirman visualmente y no se garantizan.
 
 Validación: las siete capturas proporcionadas se clasifican correctamente como panel pendiente/completo, anuncio con contador/X, victoria, opción de conceder y derrota con reintento. 172 pruebas pasan, incluyendo cinco tarjetas, diferencia entre azul y medalla, exclusión de X lateral/de ventana, recorrido de cinco victorias, reintento del mismo desafío, parada por errores, fecha sin cambio y ausencia de medalla. Navegación real en la app pendiente; no se realizaron clics durante esta implementación.
+

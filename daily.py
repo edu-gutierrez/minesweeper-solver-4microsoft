@@ -180,7 +180,7 @@ def run(output,execute=False,guess=True,click_delay=.1,max_days=None,max_rounds=
         raise
 
 
-if __name__=='__main__':
+def main(argv=None):
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--execute',action='store_true',help='Activa navegación y partidas; sin él solo inspecciona el panel.')
     parser.add_argument('--output',type=Path,default=Path('../daily-run'))
@@ -188,7 +188,11 @@ if __name__=='__main__':
     parser.add_argument('--click-delay',type=float,default=.1)
     parser.add_argument('--max-days',type=int,help='Límite opcional de días completos.')
     parser.add_argument('--max-rounds',type=int,default=200)
-    args=parser.parse_args()
+    args=parser.parse_args(argv)
     if args.max_days is not None and args.max_days<1 or args.max_rounds<1:
         parser.error('Los límites deben ser positivos.')
-    run(args.output,args.execute,not args.no_guess,args.click_delay,args.max_days,args.max_rounds)
+    return run(args.output,args.execute,not args.no_guess,args.click_delay,args.max_days,args.max_rounds)
+
+
+if __name__=='__main__':
+    main()
