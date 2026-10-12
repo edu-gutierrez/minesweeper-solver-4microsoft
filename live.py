@@ -37,19 +37,19 @@ def window_rect(user32, hwnd):
 
 def play(capture, click, check_window, output, execute=False, loop=False, max_rounds=200,
          counter_reader=None, guess=False, mode_reader=None, lives_reader=None, flag_target_reader=None,
-         open_target_reader=None, moves_reader=None):
+         open_target_reader=None, moves_reader=None, interactive=True):
     """Motor con adaptadores para probar el flujo sin controlar el ordenador."""
     output.mkdir(parents=True, exist_ok=True)
     timings = Timings(output/'timings.json')
     try:
         return _play(capture,click,check_window,output,execute,loop,max_rounds,
-                     counter_reader,guess,timings,mode_reader,lives_reader,flag_target_reader,open_target_reader,moves_reader)
+                     counter_reader,guess,timings,mode_reader,lives_reader,flag_target_reader,open_target_reader,moves_reader,interactive)
     finally:
         timings.finish()
 
 
 def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_reader,guess,timings,
-          mode_reader=None,lives_reader=None,flag_target_reader=None,open_target_reader=None,moves_reader=None):
+          mode_reader=None,lives_reader=None,flag_target_reader=None,open_target_reader=None,moves_reader=None,interactive=True):
     face_tracker=FaceTracker()
     original_capture = capture
     capture = lambda: timings.measure('capture',original_capture)
@@ -66,6 +66,13 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
     moves_left = None
     mines_left = None
     knowledge = {}
+
+    def correct_cells(frame,geometry,result,corrections_folder):
+        pending=[(r+1,c+1) for r,row in enumerate(result['board']) for c,value in enumerate(row) if value is None]
+        if pending and not interactive:
+            (corrections_folder.parent/'reading-error.json').write_text(json.dumps(result,indent=2),encoding='utf-8')
+            raise RuntimeError(f'Lectura dudosa en casillas {pending}; recorrido automático detenido.')
+        correct_uncertain(frame,geometry,result,corrections_folder)
 
     def get_target(reader,stage,diagnostics):
         nonlocal image
@@ -87,6 +94,7 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
         try:
             value = timings.measure('lives',lambda:(lives_reader or read_lives)(frame))
         except ValueError as error:
+            if not interactive: raise
             print(error)
             value = int(input('Vidas restantes: '))
             print('Devuelve el foco a Minesweeper en 5 segundos.')
@@ -115,6 +123,7 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
             try:
                 mode = timings.measure('mode',lambda:mode_reader(image)) if mode_reader else 'classic'
             except ValueError as error:
+                if not interactive: raise
                 print(error)
                 answer=input('Modo (clasico/tesoro/banderas/pulsaciones/detonacion): ').strip().lower()
                 mode={'clasico':'classic','clásico':'classic','classic':'classic',
@@ -132,6 +141,7 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
                 try:
                     flag_target=get_target(flag_target_reader or read_flag_target,'flag_target',folder/'target-retries')
                 except ValueError as error:
+                    if not interactive: raise
                     print(error)
                     flag_target=int(input('Objetivo de nuevas banderas: '))
                     print('Devuelve el foco a Minesweeper en 5 segundos.')
@@ -143,6 +153,7 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
                 try:
                     open_target=get_target(open_target_reader or read_open_target,'open_target',folder/'target-retries')
                 except ValueError as error:
+                    if not interactive: raise
                     print(error)
                     open_target=int(input('Objetivo de aperturas restantes: '))
                     print('Devuelve el foco a Minesweeper en 5 segundos.')
@@ -154,6 +165,7 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
                 try:
                     moves_left=get_target(moves_reader or read_moves_left,'moves',folder/'target-retries')
                 except ValueError as error:
+                    if not interactive: raise
                     print(error)
                     moves_left=int(input('Movimientos restantes: '))
                     print('Devuelve el foco a Minesweeper en 5 segundos.')
@@ -180,7 +192,7 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
         if reading is None:
             grid = timings.measure('grid',lambda:detect_grid(image))
             reading = timings.measure('reading',lambda:read_board(image,grid))
-        correct_uncertain(image,grid,reading,folder/'corrections')
+        correct_cells(image,grid,reading,folder/'corrections')
         if reading.get('manual_corrections'):
             print('Corrección recibida. Devuelve el foco a Minesweeper en 5 segundos.')
             time.sleep(5)
@@ -188,6 +200,7 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
             try:
                 remaining = (counter_reader or read_remaining_mines)(image)
             except ValueError as error:
+                if not interactive: raise
                 print(f'{error} Introduce el valor que muestra el contador.')
                 remaining = int(input('Minas restantes: '))
                 print('Devuelve el foco a Minesweeper en 5 segundos.')
@@ -325,7 +338,7 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
             after,after_grid,previous_image=image,previous_grid=grid,previous_reading=reading))
         stats = updated.get('reuse_stats',{})
         print(f'Lectura: {stats.get("reused_cells",0)} casillas reutilizadas; {stats.get("recognized_cells",0)} analizadas.')
-        correct_uncertain(after,after_grid,updated,folder/'after-corrections')
+        correct_cells(after,after_grid,updated,folder/'after-corrections')
         if updated.get('manual_corrections'):
             print('Corrección recibida. Devuelve el foco a Minesweeper en 5 segundos.')
             time.sleep(5)
@@ -398,7 +411,7 @@ def click_on_screen(pyautogui,left,top,action,delay=0):
         time.sleep(delay)
 
 
-def run(output, execute=False, loop=False, max_rounds=200, guess=False, click_delay=0):
+def windows_adapters(click_delay=0,message='Pon Minesweeper en primer plano. La captura comenzará en 5 segundos.'):
     if not math.isfinite(click_delay) or click_delay < 0:
         raise ValueError('La pausa entre clics debe ser finita y no negativa.')
     # Se carga solo al ejecutar en Windows, no al importar las pruebas.
@@ -412,8 +425,8 @@ def run(output, execute=False, loop=False, max_rounds=200, guess=False, click_de
     user32.GetForegroundWindow.restype = wintypes.HWND
     hwnd = user32.FindWindowW(None, 'Microsoft Minesweeper')
     if not hwnd:
-        raise RuntimeError('Abre Microsoft Minesweeper en modo clásico.')
-    print('Pon la partida clásica en primer plano. La captura comenzará en 5 segundos.')
+        raise RuntimeError('Abre Microsoft Minesweeper.')
+    print(message)
     time.sleep(5)
     if user32.GetForegroundWindow() != hwnd:
         raise RuntimeError('Microsoft Minesweeper debe estar en primer plano.')
@@ -428,6 +441,11 @@ def run(output, execute=False, loop=False, max_rounds=200, guess=False, click_de
         pyautogui.failSafeCheck()
     def click(action):
         click_on_screen(pyautogui,left,top,action,click_delay)
+    return capture,click,check_window,pyautogui
+
+
+def run(output, execute=False, loop=False, max_rounds=200, guess=False, click_delay=0):
+    capture,click,check_window,pyautogui=windows_adapters(click_delay)
     configure_tesseract()
     try:
         return play(capture,click,check_window,output,execute,loop,max_rounds,

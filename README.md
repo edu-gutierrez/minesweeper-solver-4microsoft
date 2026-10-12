@@ -358,3 +358,23 @@ En el tablero de Detonación que agotaba el cálculo, las componentes mayores ti
 `wait_stable` no considera estable una imagen con ese aviso, aunque sus píxeles no cambien: reinicia la estabilidad y espera su desaparición antes de devolver una captura para lectura. Conserva el límite de doce segundos y se detiene sin más clics si sigue cubierto. Las gafas de victoria tienen prioridad, porque entonces ya no se necesita leer el tablero. El jugador comprueba también el aviso antes del lote, antes de cada apertura y al recapturar objetivos dudosos; utiliza una imagen despejada para continuar.
 
 157 pruebas pasan, incluyendo aviso real a tres escalas, rechazo de cabecera/casillas, aviso inmóvil que desaparece, límite de espera y un aviso que aparece justo antes de un clic. Las capturas reales de round030 dan detección falsa antes y verdadera después. Prueba de una nueva notificación en la aplicación pendiente. El comando sigue igual.
+
+### Recorrer desafíos diarios automáticamente
+
+Desde el panel de desafíos, ejecuta:
+
+```powershell
+python daily.py --execute --click-delay 0.1 --output "..\daily-run"
+```
+
+Las apuestas del jugador están habilitadas para clásico, tesoro y detonación; Banderas y Pulsaciones conservan sus restricciones sin apuestas. `--no-guess` detiene las partidas que necesiten apostar. Sin `--execute`, el comando inspecciona el panel y guarda un resumen sin hacer clics. `--max-days 1` permite limitar una prueba a un día completo, y `--max-rounds` limita cada partida.
+
+`daily_vision.py` busca las cinco tarjetas rectangulares verde/morada/azul/naranja/roja y comprueba la forma del check blanco sobre medalla azul para determinar completado. La tarjeta Clásico azul sin check no cuenta como completada. Reconoce los botones por color, forma y OCR del texto permitido. La flecha derecha se localiza por plantilla en su región del panel. Se comprueba el cambio del recorte de fecha y se requieren dos observaciones iguales para aceptar cada transición.
+
+`daily.py` abre pendientes de izquierda a derecha, atiende `Jugar` si aparece, espera el vídeo y pulsa únicamente la X blanca de su esquina superior derecha cuando aparece en lugar del contador. Excluye la X de la ventana, anuncios laterales y Descargar. El límite de carga/anuncio es 150 segundos; otras transiciones esperan hasta 20 segundos y se detienen sin repetir el clic si no llegan. Luego llama al jugador con memoria nueva por intento. Ante victoria espera la ventana de resultado, pulsa Continuar y exige la medalla en la misma fecha. Ante derrota confirmada sigue Conceder, si aparece, y Vuelve a intentarlo; no hay un límite arbitrario de reintentos de derrotas.
+
+Solo avanza de día tras comprobar las cinco medallas. Pulsa la flecha derecha, exige una fecha diferente y se detiene si la primera tarjeta del nuevo día ya tiene medalla, según el criterio solicitado (no inspecciona las otras cuatro para esa parada). En el día inicial omite tarjetas ya completadas. Si el solver agota probabilidades, no tiene movimientos permitidos, falla una verificación o encuentra una lectura dudosa, detiene el recorrido y no reinicia la partida. En este controlador no hay correcciones manuales por terminal; `live.py` independiente conserva sus preguntas habituales.
+
+Cada ejecución crea una carpeta `session-...Z` en la salida: `events.json` registra navegación, `result.json` el motivo final y `stopped.png` la última captura ante errores. Las partidas quedan separadas por día, tarjeta e intento, con los diagnósticos habituales del jugador. Las comprobaciones de foco, posición de ventana y fail-safe siguen activas. Las apuestas pueden perder; las victorias se confirman visualmente y no se garantizan.
+
+Validación: las siete capturas proporcionadas se clasifican correctamente como panel pendiente/completo, anuncio con contador/X, victoria, opción de conceder y derrota con reintento. 172 pruebas pasan, incluyendo cinco tarjetas, diferencia entre azul y medalla, exclusión de X lateral/de ventana, recorrido de cinco victorias, reintento del mismo desafío, parada por errores, fecha sin cambio y ausencia de medalla. Navegación real en la app pendiente; no se realizaron clics durante esta implementación.

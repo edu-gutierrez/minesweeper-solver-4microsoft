@@ -97,9 +97,10 @@ def outcome_from_text(text):
     normalized = ''.join(c for c in unicodedata.normalize('NFKD', text.lower())
                          if not unicodedata.combining(c))
     normalized = ' '.join(''.join(c if c.isalnum() else ' ' for c in normalized).split())
-    if 'has dado en una mina' in normalized:
+    if ('has dado en una mina' in normalized or 'has marcado las casillas incorrectas' in normalized
+            or 'desafio no superado' in normalized):
         return 'lost'
-    if 'enhorabuena' in normalized:
+    if 'enhorabuena' in normalized or 'desafio superado' in normalized:
         return 'won'
     return None
 
