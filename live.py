@@ -397,6 +397,43 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
                     'outcome':outcome,'reading':updated},indent=2),encoding='utf-8')
                 print(f'Recuperación: {len(open_retried)} aperturas seguras reintentadas.')
                 if outcome:return finish(output,outcome,turn)
+        if mode=='detonate':
+            def prove_mine(fresh_reading,r,c):
+                deductions=timings.measure('deduction',lambda:deduce(fresh_reading['board'],total_mines))
+                if deductions[r][c]=='f':return True
+                proofs=timings.measure('certainty',lambda:find_certainties(deductions,total_mines))
+                return proofs.get((r,c))==1
+            recovered_counter=[]
+            def retry_detonation(action):
+                check_window()
+                frame=capture()
+                if has_achievement_banner(frame) or possible_result_dialog(frame) or not target_is_covered(frame,action,grid):
+                    raise RuntimeError('La casilla cambió al comprobar el presupuesto de recuperación.')
+                available=timings.measure('moves_recovery',lambda:(moves_reader or read_moves_left)(frame))
+                if type(available) is not int or not 0<available<=moves_left+len(executed):
+                    raise RuntimeError('No se confirmó un movimiento disponible para recuperar la detonación.')
+                timings.measure('click',lambda:click(action))
+                recovered_counter.append(available)
+            detonation_state,detonation_retried=recover_opens(executed,updated,refresh_flags,prove_mine,
+                capture,retry_detonation,check_window,grid)
+            retried+=detonation_retried
+            if detonation_state is not None:
+                after,updated,outcome=detonation_state
+                cv2.imwrite(str(folder/'after.png'),after)
+                if not outcome:
+                    observed_moves=timings.measure('moves_recovery',lambda:(moves_reader or read_moves_left)(after))
+                    upper=recovered_counter[-1] if recovered_counter else moves_left+len(executed)
+                    if type(observed_moves) is not int or not 0<=observed_moves<=upper:
+                        raise RuntimeError('No se pudo reconciliar el contador de movimientos tras la recuperación.')
+                    moves_left=observed_moves
+                (folder/'detonation-recovery.json').write_text(json.dumps({'retried_actions':detonation_retried,
+                    'moves_before_retries':recovered_counter,'moves_left':moves_left,
+                    'outcome':outcome,'reading':updated},indent=2),encoding='utf-8')
+                print(f'Recuperación: {len(detonation_retried)} detonaciones reintentadas; movimientos: {moves_left}.')
+                if outcome:
+                    if outcome=='won':mines_left=0
+                    save_mode()
+                    return finish(output,outcome,turn)
         if mode in ('treasure','opens') and any(value=='m' and reading['board'][r][c]!='m'
                                     for r,row in enumerate(updated['board']) for c,value in enumerate(row)):
             lives=get_lives(after)

@@ -16,6 +16,33 @@ class DetonationTests(unittest.TestCase):
         with patch('treasure.pytesseract.image_to_data',return_value={'text':['Detonación - Contrarreloj Difícil'],'conf':[90]}):
             self.assertEqual(read_mode(np.zeros((100,200,3),dtype=np.uint8)),'detonate')
 
+    def test_missed_detonation_recovers_once_and_reconciles_moves(self):
+        frame=np.zeros((60,70,3),dtype=np.uint8)
+        grid={'rows':1,'cols':2,'cell_size':10,'x_centers':[10,30],
+              'y_centers':[20],'detected':[[True,True]]}
+        def reading(values):
+            return {'board':[values],'flags_visible':[[False,False]],'details':[[{},{}]]}
+        budget=Mock(side_effect=[2,2,1]);actions=[]
+        with tempfile.TemporaryDirectory() as folder, \
+             patch('live.wait_stable',return_value=frame), \
+             patch('live.detect_outcome',return_value=None), \
+             patch('live.has_sunglasses',return_value=False), \
+             patch('live.possible_result_dialog',return_value=False), \
+             patch('live.detect_grid',return_value=grid), \
+             patch('live.read_board',side_effect=[reading(['?',1]),reading(['?',1]),
+                                                reading(['?',1]),reading(['m',1])]), \
+             patch('live.target_is_covered',return_value=True), \
+             patch('open_recovery.target_is_covered',return_value=True):
+            result=play(lambda:frame,actions.append,lambda:None,Path(folder),execute=True,
+                counter_reader=lambda im:1,mode_reader=lambda im:'detonate',moves_reader=budget)
+            state=json.loads((Path(folder)/'mode.json').read_text())
+            recovery=json.loads((Path(folder)/'round-001/detonation-recovery.json').read_text())
+        self.assertEqual(result['reason'],'detonation_target_reached')
+        self.assertEqual(len(actions),2)
+        self.assertEqual(state['moves_left'],1)
+        self.assertEqual(state['mines_left'],0)
+        self.assertEqual(len(recovery['retried_actions']),1)
+
     def test_plan_excludes_safe_visible_mines_and_caps_budget(self):
         grid={'x_centers':[10,30,50,70],'y_centers':[20]}
         actions=plan_detonations([['?','m','?','?']],[['f','m','o','f']],grid,1)
