@@ -350,3 +350,11 @@ Se mantienen dos segundos, 250.000 estados nuevos y el límite de 100 casillas p
 
 En el tablero de Detonación que agotaba el cálculo, las componentes mayores tienen 78 y 79 casillas (46 y 50 grupos equivalentes). La versión nueva resuelve todas las probabilidades en aproximadamente 0,07 segundos, con 1.081 estados nuevos. Las casillas (4,26) y (4,27) tienen la mayor probabilidad exacta de mina, 98,61 %. Es una medición sobre la matriz guardada, no el tiempo total de una partida. 151 pruebas pasan: incluye comparación de cuentas y marginales de grupos contra enumeración exhaustiva en 50 casos pequeños, los 25 tableros anteriores, pesos binomiales, presupuesto y el tablero detenido.
 
+
+### Avisos de logro sobre el tablero
+
+`has_achievement_banner` detecta un panel ancho rectangular en la parte superior por bordes, proporciones y posición relativa, sin OCR del texto del logro. La captura del aviso que sombreó la primera fila queda como referencia recortada de prueba. La cabecera normal y la fila de casillas no cumplen el tamaño del panel.
+
+`wait_stable` no considera estable una imagen con ese aviso, aunque sus píxeles no cambien: reinicia la estabilidad y espera su desaparición antes de devolver una captura para lectura. Conserva el límite de doce segundos y se detiene sin más clics si sigue cubierto. Las gafas de victoria tienen prioridad, porque entonces ya no se necesita leer el tablero. El jugador comprueba también el aviso antes del lote, antes de cada apertura y al recapturar objetivos dudosos; utiliza una imagen despejada para continuar.
+
+157 pruebas pasan, incluyendo aviso real a tres escalas, rechazo de cabecera/casillas, aviso inmóvil que desaparece, límite de espera y un aviso que aparece justo antes de un clic. Las capturas reales de round030 dan detección falsa antes y verdadera después. Prueba de una nueva notificación en la aplicación pendiente. El comando sigue igual.

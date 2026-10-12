@@ -147,6 +147,25 @@ def similar(a,b):
     return float(np.mean(delta > 12)) < .002
 
 
+def has_achievement_banner(image):
+    """Aviso ancho y rectangular en la parte superior; sin OCR de su texto."""
+    h,w=image.shape[:2]
+    y0=round(h*.04)
+    region=image[y0:round(h*.25)]
+    edges=cv2.Canny(cv2.cvtColor(region,cv2.COLOR_BGR2GRAY),60,160)
+    contours,_=cv2.findContours(edges,cv2.RETR_LIST,cv2.CHAIN_APPROX_SIMPLE)
+    for contour in contours:
+        x,y,cw,ch=cv2.boundingRect(contour)
+        if not (cw>w*.5 and h*.07<ch<h*.22 and x>w*.12
+                and x+cw<w*.9 and y+y0<h*.20):
+            continue
+        perimeter=cv2.arcLength(contour,True)
+        polygon=cv2.approxPolyDP(contour,perimeter*.02,True)
+        if len(polygon)==4 and cv2.isContourConvex(polygon) and cv2.contourArea(contour)>cw*ch*.8:
+            return True
+    return False
+
+
 def wait_stable(capture, grid=None, timeout=12, interval=.15, stable_seconds=.45,
                 minimum_wait=.6, clock=time.monotonic, sleep=time.sleep, tracker=None):
     start = clock()
@@ -158,6 +177,12 @@ def wait_stable(capture, grid=None, timeout=12, interval=.15, stable_seconds=.45
         # Las gafas permiten reconocer victoria sin esperar al confeti.
         if has_sunglasses(image,tracker):
             return image
+        if has_achievement_banner(image):
+            # Un aviso inmóvil puede parecer estable, pero tapa/sombrea casillas.
+            previous=None
+            stable_since=None
+            sleep(interval)
+            continue
         region = stability_region(image,grid)
         now = clock()
         if previous is not None and similar(previous,region):
@@ -169,4 +194,4 @@ def wait_stable(capture, grid=None, timeout=12, interval=.15, stable_seconds=.45
             stable_since = None
         previous = region.copy()
         sleep(interval)
-    raise RuntimeError('La animación no se estabilizó dentro del tiempo máximo; no se harán más clics.')
+    raise RuntimeError('El tablero sigue animado o cubierto dentro del tiempo máximo; no se harán más clics.')

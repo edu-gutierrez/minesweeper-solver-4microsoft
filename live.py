@@ -17,6 +17,7 @@ from analyze import correct_uncertain, solve_reading, draw_deductions
 from ocr import configure_tesseract, read_board
 from vision import detect_grid, keep_grid_geometry
 from game_state import detect_outcome, wait_stable, stability_region, similar, has_sunglasses, possible_result_dialog, FaceTracker
+from game_state import has_achievement_banner
 from profiling import Timings
 from mine_counter import read_remaining_mines
 from probability import mine_probabilities, ProbabilityLimit
@@ -73,6 +74,8 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
             nonlocal image
             check_window()
             image=capture()
+            if has_achievement_banner(image):
+                image=timings.measure('stability',lambda:wait_stable(capture,grid,tracker=face_tracker))
             return image
 
         value,image=retry_target(image,mode,lambda frame:timings.measure(stage,lambda:reader(frame)),
@@ -279,6 +282,9 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
             return finish(output,reason,turn)
         check_window()
         current = capture()
+        if has_achievement_banner(current):
+            print('Aviso de logro visible; esperando a que desaparezca.')
+            current=timings.measure('stability',lambda:wait_stable(capture,grid,tracker=face_tracker))
         if not similar(stability_region(image,grid),stability_region(current,grid)):
             raise RuntimeError('El tablero cambió durante el análisis; ejecución detenida.')
         executed=[]
@@ -288,6 +294,9 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
                 # Una apertura anterior puede haber descubierto esta casilla.
                 # Un diálogo que oscurece/cubre el tablero tampoco se pulsa.
                 latest = capture()
+                if has_achievement_banner(latest):
+                    print('Aviso de logro visible; esperando a que desaparezca.')
+                    latest=timings.measure('stability',lambda:wait_stable(capture,grid,tracker=face_tracker))
                 if timings.measure('face_check',lambda:has_sunglasses(latest,face_tracker)):
                     cv2.imwrite(str(folder/'after.png'),latest)
                     return finish(output,'won',turn)
