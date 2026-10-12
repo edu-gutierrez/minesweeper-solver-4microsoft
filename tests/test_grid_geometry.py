@@ -37,6 +37,17 @@ class GridGeometryTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             keep_grid_geometry(self.grid,observed,self.image,after)
 
+    def test_large_tiles_allow_scaled_estimator_jitter_with_pixel_evidence(self):
+        reference=copy.deepcopy(self.grid)
+        reference['cell_size']=58
+        observed=copy.deepcopy(reference)
+        observed['y_centers']=[y+3.28 for y in reference['y_centers']]
+        fixed=keep_grid_geometry(reference,observed,self.image,self.image)
+        self.assertEqual(fixed['y_centers'],reference['y_centers'])
+        shifted=cv2.warpAffine(self.image,np.float32([[1,0,0],[0,1,4]]),(120,90))
+        with self.assertRaises(RuntimeError):
+            keep_grid_geometry(reference,observed,self.image,shifted)
+
     def test_large_translation_stops_even_if_pixels_match(self):
         observed=copy.deepcopy(self.grid)
         observed['x_centers']=[30,60,90]

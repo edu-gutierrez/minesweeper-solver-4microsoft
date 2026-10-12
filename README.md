@@ -381,3 +381,5 @@ Validación: las siete capturas proporcionadas se clasifican correctamente como 
 
 
 Tras cerrar el anuncio, el tablero debe permanecer visible y sin paneles durante 1,5 segundos antes de iniciar el jugador. Un panel central o su cinta superior bloquean el inicio aunque el OCR todavía no lea Jugar/Cancelar. Así se espera el panel de instrucciones que puede aparecer con retraso; se pulsa Jugar cuando ambos botones se reconocen. Validación de esta corrección: captura suministrada y captura real detenida reconocidas como instrucciones; tablero limpio aceptado; 175 pruebas pasan, incluida la transición anuncio → tablero fugaz → instrucciones. Prueba en la aplicación pendiente.
+
+La tolerancia de centros estimados es ahora el mayor entre 3 píxeles y el 7,5 % del tamaño de casilla. Se mantiene obligatoria la evidencia de tres teselas completas idénticas en las coordenadas originales y se conserva la calibración inicial. Corrige una falsa parada en Clásico 10x12: la estimación osciló 3,27 píxeles al revelarse casillas sin que cambiara la ventana. Validado con las capturas reales de la parada y pruebas que siguen rechazando desplazamientos reales.

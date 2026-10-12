@@ -130,9 +130,12 @@ def keep_grid_geometry(reference, observed, previous_image, image):
         raise RuntimeError('La cuadrícula cambió; reinicia para recalibrar.')
     if abs(reference['cell_size']-observed['cell_size']) > 3:
         raise RuntimeError('El tamaño de las casillas cambió; reinicia para recalibrar.')
+    # Los bordes de casillas abiertas y tapadas desplazan ligeramente la
+    # estimación. La evidencia de teselas idénticas sigue siendo obligatoria.
+    center_tolerance=max(3,reference['cell_size']*.075)
     for axis in ('x_centers','y_centers'):
         if len(reference[axis]) != len(observed[axis]) or any(
-            abs(a-b)>3 for a,b in zip(reference[axis],observed[axis])
+            abs(a-b)>center_tolerance for a,b in zip(reference[axis],observed[axis])
         ):
             raise RuntimeError('El tablero cambió de posición; reinicia para recalibrar.')
     half=round(reference['cell_size']*.5)
