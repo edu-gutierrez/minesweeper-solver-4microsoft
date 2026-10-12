@@ -50,6 +50,8 @@ def component_counts(component,groups,remaining,check_budget):
             if buckets_left[i]==0:
                 active.discard(i)
     n=len(ordered)
+    if n>400:
+        raise ProbabilityLimit('Demasiados grupos para la recursión del cálculo exacto.')
     suffix_available=[None]*(n+1)
     suffix_available[n]=(0,)*len(groups)
     for index in range(n-1,-1,-1):
@@ -186,9 +188,6 @@ def mine_probabilities(board, total_mines, max_nodes=250_000, timeout=2.0):
     for component in components:
         check_budget()
         groups = [(cells,mines) for cells,mines in constraints.items() if cells <= component]
-        # Evita alcanzar el límite de recursión en fronteras enormes.
-        if len(component) > 100:
-            raise ProbabilityLimit('Frontera demasiado grande para el cálculo exacto.')
         counts,cell_counts=component_counts(component,groups,remaining,check_budget)
         if not counts:
             raise ValueError('No hay distribuciones de minas compatibles.')

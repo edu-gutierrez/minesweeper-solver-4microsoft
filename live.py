@@ -27,6 +27,7 @@ from flags_mode import read_flag_target, read_open_target, read_moves_left, appl
 from solver import deduce
 from detonation import plan_detonations, choose_detonation, newly_revealed_mines
 from flag_recovery import recover_flags
+from approximate_probability import estimate_probabilities
 
 
 def window_rect(user32, hwnd):
@@ -251,14 +252,22 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
         if not plan and guess and mode not in ('flags','opens'):
             if total_mines is None:
                 raise ValueError('Para apostar se requiere el total inicial de minas.')
+            approximate=False
             try:
                 risks = timings.measure('probability',lambda:mine_probabilities(solved,total_mines))
             except ProbabilityLimit as error:
-                print(error)
-                return finish(output,'probability_limit',turn)
+                print(f'Cálculo exacto limitado: {error} Intentando estimación.')
+                try:
+                    risks,estimate_info=timings.measure('probability_estimate',lambda:estimate_probabilities(solved,total_mines))
+                except ProbabilityLimit as estimate_error:
+                    print(estimate_error)
+                    return finish(output,'probability_limit',turn)
+                approximate=True
+                (folder/'probability-estimate.json').write_text(json.dumps(estimate_info,indent=2),encoding='utf-8')
+                print(f'Estimación aproximada: {estimate_info["samples"]} muestras compatibles; muestreo no uniforme.')
             # La enumeración puede encontrar certezas que las restas no encontraron.
             for (r,c),risk in risks.items():
-                if risk in (0,1):
+                if not approximate and risk in (0,1):
                     solved[r][c] = 'o' if risk==0 else 'f'
             plan = make_plan()
             if not plan and risks:
@@ -267,15 +276,16 @@ def _play(capture,click,check_window,output,execute,loop,max_rounds,counter_read
                     strategy='highest_mine_probability'
                 else:
                     (r,c),strategy=choose_guess(solved,risks,mode,lives)
+                if approximate:strategy='approximate_'+strategy
                 lowest=risks[(r,c)]
                 plan = [{'row':r+1,'col':c+1,'x':round(grid['x_centers'][c]),
                          'y':round(grid['y_centers'][r]),'button':'left',
-                         'guess':True,'mine_probability':float(lowest),'strategy':strategy}]
+                         'guess':True,'mine_probability':float(lowest),'strategy':strategy,'approximate':approximate}]
                 label='probabilidad de mina' if mode=='detonate' else 'riesgo de mina'
                 print(f'Apuesta: fila {r+1}, columna {c+1}; {label} {float(lowest):.1%}; {strategy}.')
             (folder/'probabilities.json').write_text(json.dumps([
                 {'row':r+1,'col':c+1,'mine_probability':float(risk),
-                 'fraction':str(risk)} for (r,c),risk in sorted(risks.items())
+                 'fraction':None if approximate else str(risk),'exact':not approximate} for (r,c),risk in sorted(risks.items())
             ],indent=2),encoding='utf-8')
         if mode in ('flags','opens','detonate'):
             knowledge={(r,c):value for r,row in enumerate(solved) for c,value in enumerate(row)

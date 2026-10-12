@@ -146,12 +146,34 @@ class GuessIntegrationTests(unittest.TestCase):
              patch('live.detect_outcome',return_value=None), \
              patch('live.detect_grid',return_value=grid), \
              patch('live.read_board',return_value=reading), \
-             patch('live.mine_probabilities',side_effect=ProbabilityLimit('limit')):
+             patch('live.mine_probabilities',side_effect=ProbabilityLimit('limit')), \
+             patch('live.estimate_probabilities',side_effect=ProbabilityLimit('samples limit')):
             actions=[]
             result=play(lambda:frame,actions.append,lambda:None,Path(folder),execute=True,
                         loop=True,counter_reader=lambda image:1,guess=True)
             self.assertEqual(result['reason'],'probability_limit')
             self.assertFalse(actions)
+
+    def test_approximate_extremes_are_only_guesses_never_flags(self):
+        frame=np.zeros((60,60,3),dtype=np.uint8)
+        grid={'rows':1,'cols':3,'cell_size':10,'x_centers':[10,30,50],'y_centers':[20]}
+        reading={'board':[['?',1,'?']],'flags_visible':[[False]*3],'details':[[{},{},{}]]}
+        with tempfile.TemporaryDirectory() as folder, \
+             patch('live.wait_stable',return_value=frame), \
+             patch('live.detect_outcome',side_effect=[None,'lost']), \
+             patch('live.detect_grid',return_value=grid), \
+             patch('live.read_board',return_value=reading), \
+             patch('live.target_is_covered',return_value=True), \
+             patch('live.mine_probabilities',side_effect=ProbabilityLimit('limit')), \
+             patch('live.estimate_probabilities',return_value=({(0,0):0,(0,2):1},{'samples':8})):
+            actions=[]
+            result=play(lambda:frame,actions.append,lambda:None,Path(folder),execute=True,
+                        loop=True,counter_reader=lambda image:1,guess=True)
+            self.assertEqual(result['reason'],'lost')
+            self.assertEqual(len(actions),1)
+            self.assertEqual(actions[0]['button'],'left')
+            self.assertTrue(actions[0]['approximate'])
+            self.assertTrue(actions[0]['guess'])
 
 
 if __name__=='__main__':
