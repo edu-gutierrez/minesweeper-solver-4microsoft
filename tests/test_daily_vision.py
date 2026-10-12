@@ -3,7 +3,7 @@ from unittest.mock import patch
 import cv2
 import numpy as np
 
-from daily_vision import detect_panel,asset,ad_close,classify
+from daily_vision import detect_panel,asset,ad_close,classify,has_large_modal
 from game_state import outcome_from_text
 
 
@@ -52,6 +52,21 @@ class DailyVisionTests(unittest.TestCase):
         im=np.full((1008,1920,3),120,dtype=np.uint8)
         with patch('daily_vision.buttons',return_value={}),patch('daily_vision.read_mode',side_effect=ValueError):
             self.assertEqual(classify(im),{'kind':'unknown'})
+
+    def test_modal_without_readable_buttons_cannot_be_classified_as_board(self):
+        im=np.full((1008,1920,3),35,dtype=np.uint8)
+        cv2.rectangle(im,(332,190),(1588,865),(210,210,210),4)
+        self.assertTrue(has_large_modal(im))
+        with patch('daily_vision.buttons',return_value={}), \
+             patch('daily_vision.read_mode',return_value='flags') as mode:
+            self.assertEqual(classify(im),{'kind':'modal_pending'})
+            mode.assert_not_called()
+
+    def test_briefing_ribbon_blocks_even_if_body_is_obscured_by_ad(self):
+        im=np.full((1008,1920,3),35,dtype=np.uint8)
+        cv2.rectangle(im,(295,190),(1626,312),(20,160,100),-1)
+        cv2.rectangle(im,(1536,655),(1838,904),(255,255,255),-1)
+        self.assertTrue(has_large_modal(im))
 
     def test_daily_outcomes(self):
         self.assertEqual(outcome_from_text('¡Desafío superado!'),'won')

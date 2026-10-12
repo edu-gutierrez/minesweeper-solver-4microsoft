@@ -58,6 +58,27 @@ class FakeDaily:
 
 
 class DailyTests(unittest.TestCase):
+    def test_post_ad_board_flash_does_not_start_solver_before_jugar(self):
+        class DelayedBriefing(FakeDaily):
+            def __init__(self):
+                super().__init__();self.pending=False;self.board_frames=0;self.started=False
+            def click(self,action):
+                super().click(action)
+                if (action['x'],action['y'])==(50,5):
+                    self.kind='board';self.pending=True;self.board_frames=0;self.started=False
+                elif action['x']==10:
+                    self.pending=False;self.started=True
+            def classify(self,image):
+                if self.pending:
+                    self.board_frames+=1
+                    if self.board_frames>=3:self.kind='briefing'
+                return super().classify(image)
+            def player(self,folder):
+                if not self.started:raise AssertionError('Solver antes de pulsar Jugar')
+                return super().player(folder)
+        ui=DelayedBriefing();result=self.run_flow(ui,max_days=1)
+        self.assertEqual(result['reason'],'day_limit');self.assertEqual(ui.calls,5)
+
     def test_automatic_solver_stops_on_uncertain_cell_without_prompt(self):
         frame=np.zeros((60,60,3),dtype=np.uint8)
         grid={'rows':1,'cols':1,'cell_size':10,'x_centers':[20],'y_centers':[20],'detected':[[True]]}

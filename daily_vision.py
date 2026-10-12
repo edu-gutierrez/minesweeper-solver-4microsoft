@@ -146,6 +146,25 @@ def is_video_ad(image):
     return bool(np.mean(np.max(corner,axis=2)<70)>.75)
 
 
+def has_large_modal(image):
+    """Panel central grande, incluso cuando los botones aún están apareciendo."""
+    h,w=image.shape[:2];left=round(w*.12);top=round(h*.15)
+    crop=image[top:round(h*.92),left:round(w*.9)]
+    edges=cv2.Canny(cv2.cvtColor(crop,cv2.COLOR_BGR2GRAY),60,160)
+    contours,_=cv2.findContours(edges,cv2.RETR_LIST,cv2.CHAIN_APPROX_SIMPLE)
+    for contour in contours:
+        x,y,cw,ch=cv2.boundingRect(contour)
+        body=w*.5<cw<w*.8 and h*.4<ch<h*.8
+        ribbon=w*.55<cw<w*.8 and h*.065<ch<h*.16 and h*.16<top+y<h*.32
+        # El anuncio lateral puede romper el contorno del cuerpo; la cinta
+        # superior del panel sigue siendo visible y basta para bloquearlo.
+        if not ((body or ribbon) and top+y<h*.32 and x+left>w*.14):continue
+        polygon=cv2.approxPolyDP(contour,.02*cv2.arcLength(contour,True),True)
+        if len(polygon)==4 and cv2.isContourConvex(polygon) and cv2.contourArea(contour)>cw*ch*.75:
+            return True
+    return False
+
+
 def classify(image):
     if has_achievement_banner(image):
         return {'kind':'achievement'}
@@ -164,6 +183,8 @@ def classify(image):
             return {'kind':'win','buttons':controls}
     if 'jugar' in controls and 'cancelar' in controls:
         return {'kind':'briefing','buttons':controls}
+    if has_large_modal(image):
+        return {'kind':'modal_pending'}
     if not possible_result_dialog(image):
         try:
             mode=read_mode(image)

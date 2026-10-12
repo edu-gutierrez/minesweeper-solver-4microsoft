@@ -65,13 +65,20 @@ def run_daily(capture,click,check_window,output,execute=False,guess=True,max_rou
         start=clock()
         closed=False
         briefing=False
+        board_since=None
         while clock()-start<150:
             scene=snapshot()
             kind=scene['kind']
             if kind=='board':
                 if scene['mode']!=expected_mode:
                     raise RuntimeError('Se abrió un modo distinto al de la tarjeta seleccionada.')
-                return
+                # Después del anuncio puede verse el tablero antes de que
+                # aparezca el panel de instrucciones. No arrancar al primer frame.
+                if board_since is None:board_since=clock()
+                if clock()-board_since>=1.5:return
+                sleep(.5)
+                continue
+            board_since=None
             if kind=='ad':
                 if scene.get('close') and not closed:
                     act(scene['close'],'cerrar anuncio de vídeo')
